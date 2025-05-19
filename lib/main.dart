@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:project1/models/reservation_model.dart';
-import 'package:project1/screens/home_screen.dart';
+import 'package:parkswap/models/reservation_model.dart';
+import 'package:parkswap/screens/home_screen.dart';
 
 void main() {
   runApp(

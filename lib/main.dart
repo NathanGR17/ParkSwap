@@ -2,8 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:parkswap/models/reservation_model.dart';
 import 'package:parkswap/screens/home_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-void main() {
+void main() async{
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: 'https://joelfrapfycnsilvmtpg.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpvZWxmcmFwZnljbnNpbHZtdHBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcwNTcyNTgsImV4cCI6MjA2MjYzMzI1OH0.AyoabNLDCiLbXMPHAaZJnzawqdalUAVOdbWxtWsD9gE',
+  );
   runApp(
     ChangeNotifierProvider(
       create: (context) => ReservationProvider(),

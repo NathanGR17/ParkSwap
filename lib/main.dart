@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:parkswap/models/reservation_model.dart';
-import 'package:parkswap/screens/home_screen.dart';
+import 'auth/auth_provider.dart';
+import 'auth/login_screen.dart';
 
 void main() {
   runApp(
     ChangeNotifierProvider(
-      create: (context) => ReservationProvider(),
+      create: (context) => AuthProvider(),
       child: const MyApp(),
     ),
   );
@@ -18,9 +18,13 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Parking App',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: const HomeScreen(),
+      title: 'ParkSwap',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        visualDensity: VisualDensity.adaptivePlatformDensity,
+      ),
+      home: const LoginScreen(), // Pantalla inicial de login
+      debugShowCheckedModeBanner: false,
     );
   }
 }

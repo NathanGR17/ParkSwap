@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:parkswap/models/reservation_model.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ReservationsScreen extends StatefulWidget {
   const ReservationsScreen({super.key});
@@ -10,123 +9,122 @@ class ReservationsScreen extends StatefulWidget {
 }
 
 class _ReservationsScreenState extends State<ReservationsScreen> {
+  final String userId = 'a0fb52ec-6500-4655-9e4e-c31e0a4d2dc0';
+
+  Future<List<Map<String, dynamic>>> _fetchReservations() async {
+    final response = await Supabase.instance.client
+        .from('reserves_with_vehicle')
+        .select('*')
+        .eq('id_usuari', userId)
+        .gt('hora_final', DateTime.now().toIso8601String())
+        .order('hora_inici', ascending: false);
+
+    return (response as List<dynamic>).cast<Map<String, dynamic>>();
+  }
+
+  Future<void> _deleteReservation(String id) async {
+    await Supabase.instance.client.from('reserves').delete().eq('id', id);
+    setState(() {}); // Recarrega la llista
+  }
+
   @override
   Widget build(BuildContext context) {
-    final reservation = Provider.of<ReservationProvider>(context).currentReservation;
-
-    if (reservation == null) {
-      return const Center(child: Text('No tens reserves actives'));
-    }
-
-    // Calcula el tiempo restante
-    final endTime = reservation.startTime.add(Duration(minutes: reservation.durationMinutes));
-    final remaining = endTime.difference(DateTime.now());
-
     return Scaffold(
-      appBar: AppBar(title: const Text('Reserves')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Reserva actual', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Ubicació: ${reservation.street}'),
-                    const SizedBox(height: 10),
-                    Text('Hora inici: ${reservation.startTime.toString().substring(11, 16)}'),
-                    const SizedBox(height: 10),
-                    Text('Temps restant: ${remaining.inMinutes} minuts'),
-                    const SizedBox(height: 10),
-                    Text('Cost: ${reservation.totalCost} € (${reservation.pricePerHour}€/h)'),
-                    const SizedBox(height: 20),
-                    const Text('Accions disponibles:', style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 10),
-                    Row(
+      appBar: AppBar(title: const Text('Reserves actives')),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _fetchReservations(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return const Center(child: Text('No tens reserves actives'));
+          }
+          final reservations = snapshot.data!;
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: reservations.length,
+            itemBuilder: (context, index) {
+              final res = reservations[index];
+              print(res);
+              final vehicles = res['vehicles'];
+              final matricula = res['vehicle_matricula'] ?? res['id_vehicle'];
+              final carrer = res['carrers'];
+              final start = DateTime.parse(res['hora_inici']);
+              final end = DateTime.parse(res['hora_final']);
+              final remaining = end.difference(DateTime.now());
+
+              return GestureDetector(
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      title: const Text('Detalls de la reserva'),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Carrer: ${carrer?['nom'] ?? res['carrer_nom']}'),
+                          Text('Matrícula: $matricula'),
+                          Text('Hora inici: ${start.toString().substring(0, 16).replaceAll('T', ' ')}'),
+                          Text('Hora final: ${end.toString().substring(0, 16).replaceAll('T', ' ')}'),
+                          Text('Temps restant: ${remaining.inMinutes > 0 ? "${remaining.inMinutes} minuts" : "Caducada"}'),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                  onPressed: () async {
+                                    await _deleteReservation(res['id'].toString());
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Reserva cancel·lada')),
+                                    );
+                                  },
+                                  child: const Text('Cancel·lar reserva', style: TextStyle(color: Colors.white)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+                child: Card(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () {
-                              Provider.of<ReservationProvider>(context, listen: false)
-                                  .extendReservation(30);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Reserva ampliada 30 minuts')),
-                              );
-                            },
-                            child: const Text('+30 min'),
-                          ),
+                        Row(
+                          children: [
+                            const Icon(Icons.local_parking, color: Colors.blue),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                carrer?['nom'] ?? 'Carrer: ${res['carrer_nom']}',
+                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () {
-                              Provider.of<ReservationProvider>(context, listen: false)
-                                  .extendReservation(60);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Reserva ampliada 1 hora')),
-                              );
-                            },
-                            child: const Text('+1 hora'),
-                          ),
-                        ),
+                        const SizedBox(height: 10),
+                        Text('Matrícula: $matricula'),
+                        const SizedBox(height: 6),
+                        Text('Inici: ${start.toString().substring(11, 16)}'),
+                        Text('Fi: ${end.toString().substring(11, 16)}'),
+                        Text('Temps restant: ${remaining.inMinutes > 0 ? "${remaining.inMinutes} minuts" : "Caducada"}'),
                       ],
                     ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                        onPressed: () {
-                          Provider.of<ReservationProvider>(context, listen: false)
-                              .cancelReservation();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Reserva cancel·lada')),
-                          );
-                        },
-                        child: const Text('Finalitzar reserva', style: TextStyle(color: Colors.white)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.help_outline),
-                label: const Text('Ajuda o incidència'),
-                onPressed: () => showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Incidència'),
-                    content: const Text('Descriu el problema:'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Cancel·lar'),
-                      ),
-                      ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Incidència reportada')),
-                          );
-                        },
-                        child: const Text('Enviar'),
-                      ),
-                    ],
                   ),
                 ),
-              ),
-            ),
-          ],
-        ),
+              );
+            },
+          );
+        },
       ),
     );
   }

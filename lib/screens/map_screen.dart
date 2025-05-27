@@ -1,3 +1,4 @@
+// Importacions
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -7,16 +8,18 @@ import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:parkswap/models/reservation_model.dart';
 
-
+// PoiMarker amb carrerId afegit
 class PoiMarker extends Marker {
   final String title;
   final String description;
   final String imageUrl;
   final Color markerColor;
   final IconData iconData;
-  final int plazasLibres; // Nuevo campo para plazas libres
+  final int plazasLibres;
+  final String carrerId; // Afegit
 
   PoiMarker({
     required LatLng position,
@@ -25,7 +28,8 @@ class PoiMarker extends Marker {
     required this.imageUrl,
     this.markerColor = Colors.blue,
     this.iconData = Icons.place,
-    required this.plazasLibres, // Asegúrate de incluir este parámetro
+    required this.plazasLibres,
+    required this.carrerId, // Afegit
   }) : super(
     point: position,
     width: 20,
@@ -37,20 +41,21 @@ class PoiMarker extends Marker {
     ),
   );
 }
+
 class ParkingMarker extends Marker {
   final DateTime markedTime;
-  final Color markerColor; // Nuevo parámetro para el color
+  final Color markerColor;
 
   ParkingMarker({
     required LatLng position,
     required this.markedTime,
-    this.markerColor = Colors.red, // Color por defecto
+    this.markerColor = Colors.red,
   }) : super(
     point: position,
-    width: 40, // Aumenté el tamaño para mejor visualización
+    width: 40,
     height: 40,
     child: Icon(
-      Icons.directions_car, // Cambié el ícono a uno de parking
+      Icons.directions_car,
       size: 20,
       color: markerColor,
     ),
@@ -59,204 +64,82 @@ class ParkingMarker extends Marker {
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
-
   @override
   State<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
+class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver{
   final mapController = MapController();
   final popupController = PopupController();
   final List<PoiMarker> poiMarkers = [];
   final PopupController poiPopupController = PopupController();
   final List<ParkingMarker> markers = [];
 
-
-  void _initializePoiMarkers() {
-    final barcelonaPois = [
-      {
-        'position': LatLng(41.397744, 2.197818), //
-        'title': 'Carrer de Llull',
-        'description': '20 places en total: 2 Lliures',
-        'imageUrl': 'https://example.com/sagrada.jpg',
-        'color': Colors.green,
-        'icon': Icons.circle,
-        'plazasLibres': 2,
-      },
-      {
-        'position': LatLng(41.397711, 2.198890), //
-        'title': 'Carrer de la Ciutat de Granada',
-        'description': '30 places en total: 4 Lliures',
-        'imageUrl': 'https://example.com/sagrada.jpg',
-        'color': Colors.green,
-        'icon': Icons.circle,
-        'plazasLibres': 4,
-      },
-      {
-        'position': LatLng(41.396884, 2.198882), //
-        'title': 'Carrer de Ramón Turró',
-        'description': '15 places en total: 0 Lliures',
-        'imageUrl': 'https://example.com/sagrada.jpg',
-        'color': Colors.red,
-        'icon': Icons.circle,
-        'plazasLibres': 0,
-      },
-      {
-        'position': LatLng(41.396913, 2.197731), //
-        'title': 'Carrer de Badajoz',
-        'description': '23 places en total: 3 Lliures',
-        'imageUrl': 'https://example.com/sagrada.jpg',
-        'color': Colors.green,
-        'icon': Icons.circle,
-        'plazasLibres': 3,
-      },
-      {
-        'position': LatLng(41.398602, 2.196627), //
-        'title': 'Carrer de Pujades',
-        'description': '18 places en total: 0 Lliures',
-        'imageUrl': 'https://example.com/sagrada.jpg',
-        'color': Colors.red,
-        'icon': Icons.circle,
-        'plazasLibres': 0,
-      },
-      {
-        'position': LatLng(41.396023, 2.198906), //
-        'title': 'Carrer de Badajoz',
-        'description': '21 places en total: 0 Lliures',
-        'imageUrl': 'https://example.com/sagrada.jpg',
-        'color': Colors.red,
-        'icon': Icons.circle,
-        'plazasLibres': 0,
-      },
-      {
-        'position': LatLng(41.396829, 2.200082), //
-        'title': 'Carrer de la Ciutat de Granada',
-        'description': '18 places en total: 0 Lliures',
-        'imageUrl': 'https://example.com/sagrada.jpg',
-        'color': Colors.red,
-        'icon': Icons.circle,
-        'plazasLibres': 0,
-      },
-      {
-        'position': LatLng(41.396068, 2.200092), //
-        'title': 'Carrer del Doctor Trueta',
-        'description': '21 places en total: 1 Lliure',
-        'imageUrl': 'https://example.com/sagrada.jpg',
-        'color': Colors.green,
-        'icon': Icons.circle,
-        'plazasLibres': 1,
-      },
-      {
-        'position': LatLng(41.398558, 2.197783), //
-        'title': 'Carrer de la Ciutat de Granada',
-        'description': '18 places en total: 0 Lliures',
-        'imageUrl': 'https://example.com/sagrada.jpg',
-        'color': Colors.red,
-        'icon': Icons.circle,
-        'plazasLibres': 0,
-      },
-      {
-        'position': LatLng(41.397778, 2.196579), //
-        'title': 'Carrer de Badajoz',
-        'description': '21 places en total: 1 Lliure',
-        'imageUrl': 'https://example.com/sagrada.jpg',
-        'color': Colors.green,
-        'icon': Icons.circle,
-        'plazasLibres': 1,
-      },
-      {
-        'position': LatLng(41.397757, 2.195503), //
-        'title': 'Carrer de Pujades',
-        'description': '18 places en total: 0 Lliures',
-        'imageUrl': 'https://example.com/sagrada.jpg',
-        'color': Colors.red,
-        'icon': Icons.circle,
-        'plazasLibres': 0,
-      },
-      {
-        'position': LatLng(41.396933, 2.196709), //
-        'title': 'Carrer de Llull',
-        'description': '21 places en total: 1 Lliure',
-        'imageUrl': 'https://example.com/sagrada.jpg',
-        'color': Colors.green,
-        'icon': Icons.circle,
-        'plazasLibres': 1,
-      },
-      {
-        'position': LatLng(41.396039, 2.197775), //
-        'title': 'Carrer de Ramon Turró',
-        'description': '18 places en total: 0 Lliures',
-        'imageUrl': 'https://example.com/sagrada.jpg',
-        'color': Colors.red,
-        'icon': Icons.circle,
-        'plazasLibres': 0,
-      },
-      {
-        'position': LatLng(41.395203, 2.198927), //
-        'title': 'Carrer del Doctor Trueta',
-        'description': '21 places en total: 1 Lliure',
-        'imageUrl': 'https://example.com/sagrada.jpg',
-        'color': Colors.green,
-        'icon': Icons.circle,
-        'plazasLibres': 1,
-      },
-
-      {
-        'position': LatLng(41.396918, 2.195469), //
-        'title': "Carrer d'Àvila",
-        'description': '21 places en total: 1 Lliure',
-        'imageUrl': 'https://example.com/sagrada.jpg',
-        'color': Colors.green,
-        'icon': Icons.circle,
-        'plazasLibres': 1,
-      },
-      {
-        'position': LatLng(41.396020, 2.196645), //
-        'title': "Carrer d'Àvila",
-        'description': '18 places en total: 0 Lliures',
-        'imageUrl': 'https://example.com/sagrada.jpg',
-        'color': Colors.red,
-        'icon': Icons.circle,
-        'plazasLibres': 0,
-      },
-      {
-        'position': LatLng(41.395165, 2.197750), //
-        'title': "Carrer d'Àvila",
-        'description': '21 places en total: 1 Lliure',
-        'imageUrl': 'https://example.com/sagrada.jpg',
-        'color': Colors.green,
-        'icon': Icons.circle,
-        'plazasLibres': 1,
-      },
-    ];
-
-    setState(() {
-      for (var poi in barcelonaPois) {
-        poiMarkers.add(PoiMarker(
-          position: poi['position'] as LatLng,
-          title: poi['title'] as String,
-          description: poi['description'] as String,
-          imageUrl: poi['imageUrl'] as String,
-          markerColor: poi['color'] as Color,
-          iconData: poi['icon'] as IconData,
-          plazasLibres: poi['plazasLibres'] as int, // Añade este parámetro
-        ));
-      }
-    });
-  }
-
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this); // Observa el cicle de vida
     _checkLocationPermission();
-    _initializePoiMarkers();
+    _fetchParkingDataFromSupabase();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // L'app torna a primer pla, refresca les dades!
+      _fetchParkingDataFromSupabase();
+    }
   }
 
   Future<void> _checkLocationPermission() async {
     final status = await Permission.location.request();
     if (!status.isGranted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Permiso de ubicación denegado')),
+        const SnackBar(content: Text('Permís de localització denegat')),
+      );
+    }
+  }
+
+  Future<void> _fetchParkingDataFromSupabase() async {
+    try {
+      final response = await Supabase.instance.client
+          .from('places_disponibles_per_carrer')
+          .select();
+
+      final data = response as List;
+
+      setState(() {
+        poiMarkers.clear();
+        for (var item in data) {
+          poiMarkers.add(PoiMarker(
+            position: LatLng(
+              double.parse(item['latitud'].toString()),
+              double.parse(item['longitud'].toString()),
+            ),
+            title: item['nom'],
+            description: '${item['places_disponibles']} places disponibles',
+            imageUrl: item['image_url'] ?? 'https://example.com/sagrada.jpg',
+            markerColor: (item['places_disponibles'] ?? 0) == 0
+                ? Colors.red
+                : (item['places_disponibles'] <= 5
+                ? Colors.yellow
+                : Colors.green),
+            iconData: Icons.circle,
+            plazasLibres: item['places_disponibles'],
+            carrerId: item['id'], // Nou
+          ));
+        }
+      });
+    } catch (e) {
+      debugPrint('Error carregant dades: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error al carregar aparcaments')),
       );
     }
   }
@@ -266,12 +149,11 @@ class _MapScreenState extends State<MapScreen> {
       final position = await Geolocator.getCurrentPosition();
       final currentLocation = LatLng(position.latitude, position.longitude);
       mapController.move(currentLocation, 17);
-
-      final shouldAddMarker = await showDialog<bool>(
+      final shouldAdd = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Añadir marcador'),
-          content: const Text('¿Quieres marcar tu posición actual?'),
+          title: const Text('Afegir marcador'),
+          content: const Text('Vols marcar la teva ubicació actual?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -279,38 +161,18 @@ class _MapScreenState extends State<MapScreen> {
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Añadir'),
+              child: const Text('Afegir'),
             ),
           ],
         ),
       );
 
-      if (shouldAddMarker == true) {
-        _addMarkerAt(currentLocation);
-      }
+      if (shouldAdd == true) _addMarkerAt(currentLocation);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error obteniendo ubicación: $e')),
+        SnackBar(content: Text('Error amb la ubicació: $e')),
       );
     }
-  }
-
-  Future<LatLng?> _searchAddress(String address) async {
-    final url = Uri.parse(
-        'https://nominatim.openstreetmap.org/search?q=$address&format=json&limit=1');
-    final response = await http.get(url, headers: {
-      'User-Agent': 'Flutter Parking App',
-    });
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data.isNotEmpty) {
-        final lat = double.parse(data[0]['lat']);
-        final lon = double.parse(data[0]['lon']);
-        return LatLng(lat, lon);
-      }
-    }
-    return null;
   }
 
   void _addMarkerAt(LatLng position) {
@@ -318,13 +180,12 @@ class _MapScreenState extends State<MapScreen> {
       markers.add(ParkingMarker(
         position: position,
         markedTime: DateTime.now(),
-        markerColor: Colors.red, // Puedes usar cualquier color
+        markerColor: Colors.red,
       ));
     });
   }
-  // Puedes añadir esta función para manejar el tiempo de reserva
+
   void _iniciarTemporizadorReserva(PoiMarker marker) {
-    // Muestra un diálogo con cuenta regresiva
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -334,7 +195,7 @@ class _MapScreenState extends State<MapScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Tu plaza está reservada por:'),
+              const Text('La teva plaça està reservada per:'),
               const SizedBox(height: 10),
               TweenAnimationBuilder(
                 duration: const Duration(minutes: 10),
@@ -342,7 +203,7 @@ class _MapScreenState extends State<MapScreen> {
                 builder: (context, value, _) {
                   final minutes = value.toInt();
                   return Text(
-                    '$minutes minutos restantes',
+                    '$minutes minuts restants',
                     style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   );
                 },
@@ -352,18 +213,18 @@ class _MapScreenState extends State<MapScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context); // Cierra el AlertDialog
-                // Oculta todos los popups del mapa
+                Navigator.pop(context);
                 popupController.hideAllPopups();
                 poiPopupController.hideAllPopups();
               },
-              child: const Text('Cerrar'),
+              child: const Text('Tancar'),
             ),
           ],
         );
       },
     );
   }
+
   void _reservarPlaza(BuildContext context, PoiMarker marker) async {
     if (marker.plazasLibres <= 0) return;
 
@@ -374,12 +235,12 @@ class _MapScreenState extends State<MapScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Ubicación: ${marker.title}'),
+            Text('Ubicació: ${marker.title}'),
             const SizedBox(height: 10),
             const Text('Tarifa: 5€/hora'),
-            const Text('Tienes 10 minutos para llegar'),
+            const Text('Tens 10 minuts per arribar'),
             const SizedBox(height: 10),
-            const Text('¿Confirmas la reserva?'),
+            const Text('Confirmes la reserva?'),
           ],
         ),
         actions: [
@@ -397,28 +258,30 @@ class _MapScreenState extends State<MapScreen> {
     );
 
     if (confirmed == true) {
-      final provider = Provider.of<ReservationProvider>(context, listen: false);
-      provider.addReservation(marker.title);
+      final now = DateTime.now();
+      final end = now.add(const Duration(hours: 2));
+      try {
+        final response = await Supabase.instance.client.from('reserves').insert({
+          'id_usuari': 'a0fb52ec-6500-4655-9e4e-c31e0a4d2dc0',
+          'id_vehicle': '849fea74-bf41-4b64-9057-40ce470de896',
+          'hora_inici': now.toIso8601String(),
+          'hora_final': end.toIso8601String(),
+          'id_carrer': marker.carrerId,
+        }).select();
 
-      // Actualizar marcador
-      final updatedMarker = PoiMarker(
-        position: marker.point,
-        title: marker.title,
-        description: '${marker.plazasLibres - 1} places lliures',
-        imageUrl: marker.imageUrl,
-        markerColor: marker.plazasLibres - 1 > 0 ? Colors.green : Colors.red,
-        iconData: Icons.local_parking,
-        plazasLibres: marker.plazasLibres - 1,
-      );
-
-      setState(() {
-        poiMarkers.remove(marker);
-        poiMarkers.add(updatedMarker);
-      });
-
-      _iniciarTemporizadorReserva(updatedMarker);
+        // Si arriba aquí, la reserva s'ha creat bé
+        await Future.delayed(const Duration(milliseconds: 300)); // Opcional: petit delay per assegurar actualització
+        await _fetchParkingDataFromSupabase();
+        _iniciarTemporizadorReserva(marker);
+      } catch (e) {
+        // Això només s'executa si hi ha un error real a la inserció
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al fer la reserva: $e')),
+        );
+      }
     }
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -428,7 +291,7 @@ class _MapScreenState extends State<MapScreen> {
             padding: const EdgeInsets.all(8),
             child: TextField(
               decoration: const InputDecoration(
-                hintText: 'Buscar dirección...',
+                hintText: 'Buscar direcció...',
                 suffixIcon: Icon(Icons.search),
                 border: OutlineInputBorder(),
               ),
@@ -439,7 +302,7 @@ class _MapScreenState extends State<MapScreen> {
                   _addMarkerAt(coords);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Dirección no encontrada')),
+                    const SnackBar(content: Text('Direcció no trobada')),
                   );
                 }
               },
@@ -449,7 +312,7 @@ class _MapScreenState extends State<MapScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: ElevatedButton.icon(
               icon: const Icon(Icons.my_location),
-              label: const Text('Marcar mi ubicación actual'),
+              label: const Text('Marcar la meva ubicació actual'),
               onPressed: _getCurrentLocation,
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 50),
@@ -460,17 +323,14 @@ class _MapScreenState extends State<MapScreen> {
             child: FlutterMap(
               mapController: mapController,
               options: MapOptions(
-                initialCenter: const LatLng(41.403957, 2.193989), // Añade const
+                initialCenter: const LatLng(41.403957, 2.193989),
                 initialZoom: 15,
                 onTap: (_, latlng) {
-                  // Añadir nuevo marcador de parking al tocar
                   _addMarkerAt(latlng);
-                  // Cerrar todos los popups
                   popupController.hideAllPopups();
                   poiPopupController.hideAllPopups();
                 },
                 onLongPress: (_, __) {
-                  // Cerrar todos los popups al hacer long press
                   popupController.hideAllPopups();
                   poiPopupController.hideAllPopups();
                 },
@@ -480,56 +340,10 @@ class _MapScreenState extends State<MapScreen> {
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.example.app',
                 ),
-                // Capa para tus marcadores de parking originales
-                PopupMarkerLayerWidget(
-                  options: PopupMarkerLayerOptions(
-                    markers: markers,
-                    popupController: popupController,
-                    markerTapBehavior: MarkerTapBehavior.togglePopup(),
-                    popupDisplayOptions: PopupDisplayOptions(
-                      builder: (context, marker) {
-                        if (marker is ParkingMarker) {
-                          final duration = DateTime.now().difference(marker.markedTime);
-                          final hours = duration.inHours;
-                          final minutes = duration.inMinutes.remainder(60);
-
-                          return Card(
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    'Marcado hace:',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    hours > 0
-                                        ? '$hours h $minutes min'
-                                        : '$minutes min',
-                                    style: TextStyle(fontSize: 14),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }
-                        return const SizedBox();
-                      },
-                    ),
-                  ),
-                ),
-
-// Capa adicional para los nuevos marcadores POI
-                PopupMarkerLayerWidget(
+                PopupMarkerLayer(
                   options: PopupMarkerLayerOptions(
                     markers: poiMarkers,
                     popupController: poiPopupController,
-                    markerTapBehavior: MarkerTapBehavior.togglePopup(),
                     popupDisplayOptions: PopupDisplayOptions(
                       builder: (context, marker) {
                         if (marker is PoiMarker) {
@@ -539,26 +353,14 @@ class _MapScreenState extends State<MapScreen> {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(
-                                    marker.title,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
+                                  Text(marker.title, style: const TextStyle(fontWeight: FontWeight.bold)),
                                   const SizedBox(height: 8),
                                   Text(marker.description),
                                   const SizedBox(height: 12),
-                                  // Mostrar botón solo si hay plazas libres
                                   if (marker.plazasLibres > 0)
                                     ElevatedButton(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.green, // Color verde
-                                        minimumSize: const Size(double.infinity, 40),
-                                      ),
                                       onPressed: () => _reservarPlaza(context, marker),
-                                      child: const Text('Reservar Plaza',
-                                          style: TextStyle(color: Colors.white)),
+                                      child: const Text('Reservar plaça'),
                                     ),
                                 ],
                               ),
@@ -570,11 +372,26 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                   ),
                 ),
+                MarkerLayer(markers: markers),
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  Future<LatLng?> _searchAddress(String address) async {
+    final url = Uri.parse('https://nominatim.openstreetmap.org/search?q=$address&format=json&limit=1');
+    final response = await http.get(url, headers: {'User-Agent': 'Flutter Parking App'});
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data.isNotEmpty) {
+        final lat = double.parse(data[0]['lat']);
+        final lon = double.parse(data[0]['lon']);
+        return LatLng(lat, lon);
+      }
+    }
+    return null;
   }
 }

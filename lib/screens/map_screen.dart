@@ -423,15 +423,28 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      //appBar: AppBar(
+        //title: const Text('INICI'),
+      //),
       appBar: AppBar(
-        title: const Text('INICI'),
+        backgroundColor: Colors.white,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: Image.asset('assets/images/logo_parkswap_IA_png.png'),
+            onPressed: () {
+              Scaffold.of(context).openDrawer(); // Abre el Drawer
+            },
+          ),
+        ),
+        title: const Text('INICI', style: TextStyle(color: Colors.black)),
+        iconTheme: const IconThemeData(color: Colors.black),
       ),
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
             const DrawerHeader(
-              decoration: BoxDecoration(color: Colors.blue),
+              decoration: BoxDecoration(color: Color(0xFF538878)),
               child: Text('Menú', style: TextStyle(color: Colors.white, fontSize: 24)),
             ),
             ListTile(

@@ -4,6 +4,8 @@ import 'search_screen.dart';
 import 'reservations_screen.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
+import '../pages/chat_page.dart';
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,6 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
     const SearchScreen(),
     const ReservationsScreen(),
     const HistoryScreen(),
+    const ChatPage(), //
     const ProfileScreen(),
   ];
 
@@ -47,6 +50,10 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.history),
             label: 'Historial',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.chat),
+            label: 'Chat', // 👈 Añadido aquí
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),

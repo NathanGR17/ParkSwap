@@ -1,37 +1,93 @@
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class Reservation {
-  final String id;
-  final String street;
-  final DateTime startTime;
+  final int id;
+  final String idUsuari;
+  final DateTime horaInici;
+  final DateTime horaFinal;
+  final int idVehicle;
+  final int idCarrer;
+  final String vehicleMatricula;
+  final String carrerNom;
+
+  // Camps locals opcionals
   final double pricePerHour;
   int durationMinutes;
 
   Reservation({
     required this.id,
-    required this.street,
-    required this.startTime,
+    required this.idUsuari,
+    required this.horaInici,
+    required this.horaFinal,
+    required this.idVehicle,
+    required this.idCarrer,
+    required this.vehicleMatricula,
+    required this.carrerNom,
     this.pricePerHour = 5.0,
-    this.durationMinutes = 60, // 1 hora por defecto
+    this.durationMinutes = 60,
   });
 
-  String get endTime => startTime.add(Duration(minutes: durationMinutes)).toString().substring(11, 16);
-  String get totalCost => (pricePerHour * durationMinutes / 60).toStringAsFixed(2);
+  // Constructor des de Supabase
+  factory Reservation.fromMap(Map<String, dynamic> map) {
+    return Reservation(
+      id: map['id'],
+      idUsuari: map['id_usuari'],
+      horaInici: DateTime.parse(map['hora_inici']),
+      horaFinal: DateTime.parse(map['hora_final']),
+      idVehicle: map['id_vehicle'],
+      idCarrer: map['id_carrer'],
+      vehicleMatricula: map['vehicle_matricula'] ?? '',
+      carrerNom: map['carrer_nom'] ?? '',
+      // Si vols, pots calcular pricePerHour i durationMinutes a partir de la resposta
+    );
+  }
+
+  String get endTime => horaFinal.toString().substring(11, 16);
+  String get totalCost {
+    final minuts = horaFinal.difference(horaInici).inMinutes;
+    return (pricePerHour * minuts / 60).toStringAsFixed(2);
+  }
 }
 
 class ReservationProvider with ChangeNotifier {
   List<Reservation> _history = [];
   Reservation? _currentReservation;
-  final Map<String, int> _parkingSpots = {}; // Almacena plazas disponibles por ubicación
+  final Map<String, int> _parkingSpots = {};
 
   List<Reservation> get history => _history;
   Reservation? get currentReservation => _currentReservation;
 
+  // Carrega historial des de Supabase
+  Future<void> fetchUserReservations(String userId) async {
+    final supabase = Supabase.instance.client;
+    final response = await supabase
+        .from('reserves_with_vehicle')
+        .select()
+        .eq('id_usuari', userId)
+        .order('hora_inici', ascending: false);
+
+    print('Resposta Supabase: $response');
+
+
+    if (response != null && response is List) {
+      _history = response
+          .map((r) => Reservation.fromMap(r as Map<String, dynamic>))
+          .toList();
+      notifyListeners();
+    }
+  }
+
   void addReservation(String street) {
     _currentReservation = Reservation(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      street: street,
-      startTime: DateTime.now(),
+      id: DateTime.now().millisecondsSinceEpoch,
+      idUsuari: '',
+      horaInici: DateTime.now(),
+      horaFinal: DateTime.now().add(const Duration(hours: 1)),
+      idVehicle: 0,
+      idCarrer: 0,
+      vehicleMatricula: '',
+      carrerNom: street,
     );
     notifyListeners();
   }
@@ -44,16 +100,14 @@ class ReservationProvider with ChangeNotifier {
     }
   }
 
-  // Nuevo método para actualizar plazas disponibles
   void updateParkingSpots(String location, int spots) {
     _parkingSpots[location] = spots;
     notifyListeners();
   }
 
-  // Nuevo método para obtener plazas disponibles
   int getAvailableSpots(String location) {
     return _parkingSpots[location] ??
-        _history.where((r) => r.street == location).length;
+        _history.where((r) => r.carrerNom == location).length;
   }
 
   void extendReservation(int minutes) {

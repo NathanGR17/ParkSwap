@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:parkswap/auth/auth_provider.dart';
 import 'package:parkswap/auth/register_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bcrypt/bcrypt.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,26 +16,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-
-  // Lista de usuarios de prueba
-  final List<Map<String, String>> testUsers = [
-    {
-      'email': 'usuario1@test.com',
-      'password': '123456',
-      'name': 'Carlos',
-      'surname': 'Mendoza',
-      'phone': '+34 678056559',
-      'licensePlate': 'JNX 7295'
-    },
-    {
-      'email': 'usuario2@test.com',
-      'password': '123456',
-      'name': 'Ana',
-      'surname': 'García',
-      'phone': '+34 600112233',
-      'licensePlate': 'ABC 1234'
-    },
-  ];
 
   @override
   void dispose() {
@@ -52,9 +34,8 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Logo personalizado - reemplaza con tu imagen
               Image.asset(
-                'assets/images/logo_parkswap.png', // Ruta a tu logo
+                'assets/images/logo_parkswap.png',
                 height: 100,
                 width: 100,
               ),
@@ -74,42 +55,21 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: TextStyle(fontSize: 14, color: Colors.grey),
               ),
               const SizedBox(height: 30),
-              Autocomplete<String>(
-                optionsBuilder: (TextEditingValue textEditingValue) {
-                  return testUsers
-                      .map((user) => user['email']!)
-                      .where((email) => email
-                      .toLowerCase()
-                      .contains(textEditingValue.text.toLowerCase()));
-                },
-                onSelected: (String email) {
-                  final user = testUsers.firstWhere(
-                          (user) => user['email'] == email);
-                  _emailController.text = email;
-                  _passwordController.text = user['password']!;
-                },
-                fieldViewBuilder: (BuildContext context,
-                    TextEditingController emailController,
-                    FocusNode focusNode,
-                    VoidCallback onFieldSubmitted) {
-                  return TextFormField(
-                    controller: emailController,
-                    focusNode: focusNode,
-                    decoration: const InputDecoration(
-                      labelText: 'Correu electrònic',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.email),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Si us plau, introdueix el teu correu';
-                      }
-                      if (!value.contains('@')) {
-                        return 'Correu electrònic invàlid';
-                      }
-                      return null;
-                    },
-                  );
+              TextFormField(
+                controller: _emailController,
+                decoration: const InputDecoration(
+                  labelText: 'Correu electrònic',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.email),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Si us plau, introdueix el teu correu';
+                  }
+                  if (!value.contains('@')) {
+                    return 'Correu electrònic invàlid';
+                  }
+                  return null;
                 },
               ),
               const SizedBox(height: 15),
@@ -143,9 +103,9 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   if (_formKey.currentState!.validate()) {
-                    _loginWithTestUser(context);
+                    await _loginWithSupabase(context);
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -175,35 +135,56 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _loginWithTestUser(BuildContext context) {
+  Future<void> _loginWithSupabase(BuildContext context) async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final email = _emailController.text.trim(); // Añadido trim()
-    final password = _passwordController.text.trim(); // Añadido trim()
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
 
-    try {
-      final user = testUsers.firstWhere(
-              (u) => u['email']?.toLowerCase() == email.toLowerCase() &&
-              u['password'] == password
-      );
+    final supabase = Supabase.instance.client;
+    final response = await supabase
+        .from('usuaris')
+        .select()
+        .eq('email', email)
+        .maybeSingle();
 
-      authProvider.login(
-        email: user['email']!,
-        name: user['name']!,
-        surname: user['surname']!,
-        phone: user['phone']!,
-        licensePlate: user['licensePlate']!,
-      );
-
-      // Navegar al home después del login
-      Navigator.pushReplacementNamed(context, '/home');
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Credenciales incorrectas. Usuarios disponibles:\n${testUsers.map((u) => u['email']).join('\n')}'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 5),
-        ),
-      );
+    if (response == null) {
+      _showError('No existeix cap usuari amb aquest correu.');
+      return;
     }
+
+    final passwordHash = response['password_hash'] as String?;
+    if (passwordHash == null || !BCrypt.checkpw(password, passwordHash)) {
+      _showError('Contrasenya incorrecta.');
+      return;
+    }
+
+    // Extraeix dades de l'usuari
+    final nomComplet = (response['nom'] as String?) ?? '';
+    final parts = nomComplet.split(' ');
+    final name = parts.isNotEmpty ? parts.first : '';
+    final surname = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+    final phone = response['telefon'] ?? '';
+    final licensePlate = response['matricula'] ?? '';
+
+    authProvider.login(
+      id: response['id'],
+      email: email,
+      name: name,
+      surname: surname,
+      phone: phone,
+      licensePlate: licensePlate,
+    );
+
+    Navigator.pushReplacementNamed(context, '/home');
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 }

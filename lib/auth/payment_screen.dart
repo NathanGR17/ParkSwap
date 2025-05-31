@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:parkswap/auth/auth_provider.dart';
-import 'package:parkswap/screens/home_screen.dart'; // Tu pantalla principal de la app
+import 'package:parkswap/screens/home_screen.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:flutter_stripe/flutter_stripe.dart';
 
 class PaymentScreen extends StatefulWidget {
   const PaymentScreen({super.key});
@@ -17,7 +20,31 @@ class _PaymentScreenState extends State<PaymentScreen> {
   final _cardHolderController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
-  @override
+  // Nova funció per afegir targeta a Stripe
+  Future<void> addCardToStripe(String customerId, String userId) async {
+    // 1. Obtenir clientSecret del backend
+    final response = await http.post(
+      Uri.parse('http://10.0.2.2:4242/create-setup-intent'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'customerId': customerId}),
+    );
+    final clientSecret = json.decode(response.body)['clientSecret'];
+
+    // 2. Presentar el formulari de Stripe per afegir la targeta
+    await Stripe.instance.initPaymentSheet(
+      paymentSheetParameters: SetupPaymentSheetParameters(
+        merchantDisplayName: 'ParkSwap',
+        customerId: customerId,
+        setupIntentClientSecret: clientSecret,
+        style: ThemeMode.light,
+      ),
+    );
+    await Stripe.instance.presentPaymentSheet();
+
+    // 3. Obtenir el paymentMethodId (opcional: podries obtenir-lo via webhook)
+    // Alternativament, fes servir Stripe webhooks per associar payment method a customer i guardar-ho a Supabase.
+  }
+
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -155,6 +182,21 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     );
                   }
                 },
+                /*onPressed: () async {
+                  if (_formKey.currentState!.validate()) {
+                    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                    final userId = authProvider.userId; // Assegura't que tens l'userId
+                    final customerId = authProvider.customerId; // Assegura't que tens el customerId
+
+                    await addCardToStripe(customerId, userId);
+
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (context) => const HomeScreen()),
+                          (route) => false,
+                    );
+                  }
+                },*/
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 50),
                 ),

@@ -18,8 +18,8 @@ class _LoginScreenState extends State<LoginScreen> {
   // Lista de usuarios de prueba
   final List<Map<String, String>> testUsers = [
     {
-      'email': 'usuario1@test.com',
-      'password': '123456',
+      'email': 'demo@demo.com',
+      'password': 'demo123',
       'name': 'Carlos',
       'surname': 'Mendoza',
       'phone': '+34 678056559',
@@ -199,7 +199,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Credenciales incorrectas. Usuarios disponibles:\n${testUsers.map((u) => u['email']).join('\n')}'),
+          content: Text('Credencials incorrectes.'),
           backgroundColor: Colors.red,
           duration: const Duration(seconds: 5),
         ),

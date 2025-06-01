@@ -1,3 +1,4 @@
+import '../pages/chat_page.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -422,13 +423,51 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      //appBar: AppBar(
+        //title: const Text('INICI'),
+      //),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: Image.asset('assets/images/logo_parkswap_IA_png.png'),
+            onPressed: () {
+              Scaffold.of(context).openDrawer(); // Abre el Drawer
+            },
+          ),
+        ),
+        title: const Text('INICI', style: TextStyle(color: Colors.black)),
+        iconTheme: const IconThemeData(color: Colors.black),
+      ),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            const DrawerHeader(
+              decoration: BoxDecoration(color: Color(0xFF538878)),
+              child: Text('Menú', style: TextStyle(color: Colors.white, fontSize: 24)),
+            ),
+            ListTile(
+              leading: Icon(Icons.chat),
+              title: Text('Assistent de ParkSwap'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ChatPage()),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.all(8),
             child: TextField(
               decoration: const InputDecoration(
-                hintText: 'Buscar dirección...',
+                hintText: 'Buscar adreça...',
                 suffixIcon: Icon(Icons.search),
                 border: OutlineInputBorder(),
               ),
@@ -439,7 +478,7 @@ class _MapScreenState extends State<MapScreen> {
                   _addMarkerAt(coords);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Dirección no encontrada')),
+                    const SnackBar(content: Text('Adreça no trobada')),
                   );
                 }
               },
@@ -449,7 +488,7 @@ class _MapScreenState extends State<MapScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: ElevatedButton.icon(
               icon: const Icon(Icons.my_location),
-              label: const Text('Marcar mi ubicación actual'),
+              label: const Text('Marcar la meva ubicació actual'),
               onPressed: _getCurrentLocation,
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 50),
@@ -500,7 +539,7 @@ class _MapScreenState extends State<MapScreen> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    'Marcado hace:',
+                                    'Marcat fa:',
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 16,
@@ -557,7 +596,7 @@ class _MapScreenState extends State<MapScreen> {
                                         minimumSize: const Size(double.infinity, 40),
                                       ),
                                       onPressed: () => _reservarPlaza(context, marker),
-                                      child: const Text('Reservar Plaza',
+                                      child: const Text('Reservar Plaça',
                                           style: TextStyle(color: Colors.white)),
                                     ),
                                 ],

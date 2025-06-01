@@ -724,7 +724,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.only(top: 20, left: 16, right: 16, bottom: 8),
+            padding: const EdgeInsets.only(top: 50, left: 16, right: 16, bottom: 8),
             child: Column(
               children: [
                 Row(

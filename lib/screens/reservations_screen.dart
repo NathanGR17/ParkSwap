@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:parkswap/auth/auth_provider.dart';
 
 class ReservationsScreen extends StatefulWidget {
   const ReservationsScreen({super.key});
@@ -9,15 +12,19 @@ class ReservationsScreen extends StatefulWidget {
 }
 
 class _ReservationsScreenState extends State<ReservationsScreen> {
-  final String userId = 'a0fb52ec-6500-4655-9e4e-c31e0a4d2dc0';
+  late String userId;
 
   Future<List<Map<String, dynamic>>> _fetchReservations() async {
+    print('Hora actual: ${DateTime.now().toIso8601String()}'); // <-- Añade este print
+    print('ID de usuario: $userId'); // <-- Añade este print
     final response = await Supabase.instance.client
         .from('reserves_with_vehicle')
         .select('*')
         .eq('id_usuari', userId)
-        .gt('hora_final', DateTime.now().toIso8601String())
+        .gt('hora_final', DateTime.now().toUtc().toIso8601String())
         .order('hora_inici', ascending: false);
+
+    print('Reservas obtenidas de Supabase: $response'); // <-- Añade este print
 
     return (response as List<dynamic>).cast<Map<String, dynamic>>();
   }
@@ -27,7 +34,24 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
     setState(() {}); // Recarrega la llista
   }
 
+  String _formatDateTime(DateTime dt) {
+    final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
+    return dateFormat.format(dt);
+  }
+
+  String _formatRemaining(Duration remaining) {
+    if (remaining.inSeconds <= 0) return 'Caducada';
+    final hours = remaining.inHours;
+    final minutes = remaining.inMinutes.remainder(60);
+    return '${hours}h ${minutes}min';
+  }
+
   @override
+  void initState() {
+    super.initState();
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    userId = authProvider.user?.id ?? '';
+  }
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Reserves actives')),
@@ -46,13 +70,18 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
             itemCount: reservations.length,
             itemBuilder: (context, index) {
               final res = reservations[index];
-              print(res);
               final vehicles = res['vehicles'];
               final matricula = res['vehicle_matricula'] ?? res['id_vehicle'];
               final carrer = res['carrers'];
-              final start = DateTime.parse(res['hora_inici']);
-              final end = DateTime.parse(res['hora_final']);
-              final remaining = end.difference(DateTime.now());
+              final startUtc = DateTime.parse(res['hora_inici']).toUtc();
+              final endUtc = DateTime.parse(res['hora_final']).toUtc();
+              final nowUtc = DateTime.now().toUtc();
+              final remaining = endUtc.difference(nowUtc);
+
+// Para mostrar en local:
+              final startStr = _formatDateTime(startUtc.toLocal());
+              final endStr = _formatDateTime(endUtc.toLocal());
+              final remainingStr = _formatRemaining(remaining);
 
               return GestureDetector(
                 onTap: () {
@@ -66,9 +95,9 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
                         children: [
                           Text('Carrer: ${carrer?['nom'] ?? res['carrer_nom']}'),
                           Text('Matrícula: $matricula'),
-                          Text('Hora inici: ${start.toString().substring(0, 16).replaceAll('T', ' ')}'),
-                          Text('Hora final: ${end.toString().substring(0, 16).replaceAll('T', ' ')}'),
-                          Text('Temps restant: ${remaining.inMinutes > 0 ? "${remaining.inMinutes} minuts" : "Caducada"}'),
+                          Text('Hora inici: $startStr'),
+                          Text('Hora final: $endStr'),
+                          Text('Temps restant: $remainingStr'),
                           const SizedBox(height: 16),
                           Row(
                             children: [
@@ -114,9 +143,9 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
                         const SizedBox(height: 10),
                         Text('Matrícula: $matricula'),
                         const SizedBox(height: 6),
-                        Text('Inici: ${start.toString().substring(11, 16)}'),
-                        Text('Fi: ${end.toString().substring(11, 16)}'),
-                        Text('Temps restant: ${remaining.inMinutes > 0 ? "${remaining.inMinutes} minuts" : "Caducada"}'),
+                        Text('Inici: $startStr'),
+                        Text('Fi: $endStr'),
+                        Text('Temps restant: $remainingStr'),
                       ],
                     ),
                   ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:parkswap/models/reservation_model.dart';
 import 'package:parkswap/screens/home_screen.dart';
+import 'package:parkswap/screens/startup_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth/auth_provider.dart';
 import 'auth/login_screen.dart';
@@ -37,9 +38,9 @@ class MyApp extends StatelessWidget {
       ),
       initialRoute: '/',
       routes: {
-        '/': (context) => LoginScreen(),
+        '/': (context) => StartupScreen(),
         '/home': (context) => HomeScreen(),
-        // otras rutas...
+        '/login': (context) => LoginScreen(),
       },
       debugShowCheckedModeBanner: false,
     );

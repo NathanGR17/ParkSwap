@@ -43,12 +43,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
         itemCount: history.length,
         itemBuilder: (context, index) {
           final reservation = history[index];
+          final localStart = reservation.horaInici.toLocal();
+          final localEnd = reservation.horaFinal.toLocal();
           final date =
-              '${reservation.horaInici.day}/${reservation.horaInici.month}/${reservation.horaInici.year.toString().substring(2)}';
+              '${localStart.day}/${localStart.month}/${localStart.year.toString().substring(2)}';
           final start =
-              '${reservation.horaInici.hour.toString().padLeft(2, '0')}:${reservation.horaInici.minute.toString().padLeft(2, '0')}';
+              '${localStart.hour.toString().padLeft(2, '0')}:${localStart.minute.toString().padLeft(2, '0')}';
           final end =
-              '${reservation.horaFinal.hour.toString().padLeft(2, '0')}:${reservation.horaFinal.minute.toString().padLeft(2, '0')}';
+              '${localEnd.hour.toString().padLeft(2, '0')}:${localEnd.minute.toString().padLeft(2, '0')}';
           return Column(
             children: [
               ListTile(

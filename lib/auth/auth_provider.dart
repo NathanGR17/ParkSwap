@@ -2,6 +2,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bcrypt/bcrypt.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class User {
   final String id;
@@ -39,7 +40,7 @@ class AuthProvider with ChangeNotifier {
     required String surname,
     required String phone,
     required String licensePlate,
-  }) {
+  }) async {
     _user = User(
       id: id,
       name: name,
@@ -48,6 +49,8 @@ class AuthProvider with ChangeNotifier {
       phone: phone,
       licensePlate: licensePlate,
     );
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('userId', id);
     notifyListeners();
   }
 
@@ -93,9 +96,36 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void logout() {
+  void logout() async{
     _user = null;
     _cardInfo = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('userId');
     notifyListeners();
+  }
+  // Metodo para intentar restaurar sesión:
+  Future<void> tryAutoLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('userId');
+    print('Intentando auto-login. userId: $userId');
+    if (userId != null) {
+      final supabase = Supabase.instance.client;
+      final response = await supabase
+          .from('usuaris')
+          .select()
+          .eq('id', userId)
+          .single();
+      print('Respuesta de Supabase: $response');
+      if (response != null) {
+        login(
+          id: response['id'],
+          email: response['email'] ?? '',
+          name: (response['nom'] ?? '').split(' ').first,
+          surname: (response['nom'] ?? '').split(' ').skip(1).join(' '),
+          phone: response['telefon'] ?? '',
+          licensePlate: response['matricula'] ?? '',
+        );
+      }
+    }
   }
 }

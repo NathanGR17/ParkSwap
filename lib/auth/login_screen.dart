@@ -199,16 +199,5 @@ class _LoginScreenState extends State<LoginScreen> {
         duration: const Duration(seconds: 4),
       ),
     );
-      // Navegar al home después del login
-      Navigator.pushReplacementNamed(context, '/home');
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Credencials incorrectes.'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 5),
-        ),
-      );
-    }
   }
 }

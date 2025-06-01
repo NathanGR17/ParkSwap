@@ -2,12 +2,12 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class Reservation {
-  final int id;
+  final String id;
   final String idUsuari;
   final DateTime horaInici;
   final DateTime horaFinal;
-  final int idVehicle;
-  final int idCarrer;
+  final String idVehicle;
+  final String idCarrer;
   final String vehicleMatricula;
   final String carrerNom;
 
@@ -31,7 +31,7 @@ class Reservation {
   // Constructor des de Supabase
   factory Reservation.fromMap(Map<String, dynamic> map) {
     return Reservation(
-      id: map['id'],
+      id: map['id'].toString(),
       idUsuari: map['id_usuari'],
       horaInici: DateTime.parse(map['hora_inici']),
       horaFinal: DateTime.parse(map['hora_final']),
@@ -67,8 +67,7 @@ class ReservationProvider with ChangeNotifier {
         .eq('id_usuari', userId)
         .order('hora_inici', ascending: false);
 
-    print('Resposta Supabase: $response');
-
+    ///print('Resposta Supabase: $response');
 
     if (response != null && response is List) {
       _history = response
@@ -78,16 +77,43 @@ class ReservationProvider with ChangeNotifier {
     }
   }
 
-  void addReservation(String street) {
+  Future<void> addReservation({
+    required String userId,
+    required String vehicleId,
+    required String carrerId,
+    required String vehicleMatricula,
+    required String carrerNom,
+    int durationMinutes = 60,
+    double pricePerHour = 5.0,
+  }) async {
+    final supabase = Supabase.instance.client;
+    final nowLocal = DateTime.now();
+    final nowUtc = nowLocal.toUtc();
+    //print('Hora local: $nowLocal');
+    //print('Hora UTC: $nowUtc');
+    final horaFinalUtc = nowUtc.add(Duration(minutes: durationMinutes));
+
+    final response = await supabase.from('reserves').insert({
+      'id_usuari': userId,
+      'id_vehicle': vehicleId,
+      'id_carrer': carrerId,
+      'hora_inici': nowUtc.toIso8601String(),
+      'hora_final': horaFinalUtc.toIso8601String(),
+    }).select().single();
+
+    //print('Respuesta de Supabase al guardar reserva: $response');
+
     _currentReservation = Reservation(
-      id: DateTime.now().millisecondsSinceEpoch,
-      idUsuari: '',
-      horaInici: DateTime.now(),
-      horaFinal: DateTime.now().add(const Duration(hours: 1)),
-      idVehicle: 0,
-      idCarrer: 0,
-      vehicleMatricula: '',
-      carrerNom: street,
+      id: response['id'],
+      idUsuari: userId,
+      horaInici: nowUtc,
+      horaFinal: horaFinalUtc,
+      idVehicle: vehicleId,
+      idCarrer: carrerId,
+      vehicleMatricula: vehicleMatricula,
+      carrerNom: carrerNom,
+      pricePerHour: pricePerHour,
+      durationMinutes: durationMinutes,
     );
     notifyListeners();
   }

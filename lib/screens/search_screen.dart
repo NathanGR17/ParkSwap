@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:parkswap/models/reservation_model.dart';
+import 'package:parkswap/auth/auth_provider.dart';
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
 
@@ -91,6 +92,19 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _showStreetInfo(String street) {
     final reservationProvider = Provider.of<ReservationProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.user;
+
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Debes iniciar sesión para reservar.')),
+      );
+      return;
+    }
+
+    // Simulación de IDs (ajusta según tu lógica real)
+    final vehicleId = "aa2078a8-bad9-4bbd-af69-ed306bac2f00";
+    final carrerId = _availableStreets.indexOf(street) + 1;
 
     showModalBottomSheet(
       context: context,
@@ -109,7 +123,13 @@ class _SearchScreenState extends State<SearchScreen> {
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
                   onPressed: () {
-                    reservationProvider.addReservation(street);
+                    reservationProvider.addReservation(
+                      userId: user.id,
+                      vehicleId: vehicleId,
+                      carrerId: carrerId.toString(),
+                      vehicleMatricula: user.licensePlate,
+                      carrerNom: street,
+                    );
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Reserva confirmada. Tens 10 minuts per arribar.')),

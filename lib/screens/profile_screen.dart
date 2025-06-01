@@ -176,6 +176,14 @@ class ProfileScreen extends StatelessWidget {
               },
             ),
             const Divider(),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: const Text('Tancar sessió', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Provider.of<AuthProvider>(context, listen: false).logout();
+                Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+              },
+            ),
           ],
         ),
       ),

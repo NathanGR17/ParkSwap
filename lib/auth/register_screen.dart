@@ -17,6 +17,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _licensePlateController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -129,19 +130,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   return null;
                 },
               ),
+              const SizedBox(height: 15),
+              const Text(
+                'Contrasenya',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 5),
+              TextFormField(
+                controller: _passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  hintText: 'Introdueix la teva contrasenya',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Si us plau, introdueix la teva contrasenya';
+                  }
+                  if (value.length < 6) {
+                    return 'La contrasenya ha de tenir almenys 6 caràcters';
+                  }
+                  return null;
+                },
+              ),
               const SizedBox(height: 30),
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   if (_formKey.currentState!.validate()) {
                     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-                    authProvider.register(
+                    await authProvider.register(
                       name: _nameController.text,
                       surname: _surnameController.text,
                       email: _emailController.text,
                       phone: _phoneController.text,
                       licensePlate: _licensePlateController.text,
+                      password: _passwordController.text,
                     );
-                    // Navegar a pantalla de pago
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => const PaymentScreen()),

@@ -19,7 +19,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final List<Widget> _screens = [
     const MapScreen(),
-    const SearchScreen(),
+    //const SearchScreen(),
     const ReservationsScreen(),
     const HistoryScreen(),
     const ChatPage(), //
@@ -34,28 +34,35 @@ class _HomeScreenState extends State<HomeScreen> {
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
         type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(
+        items: [
+          const BottomNavigationBarItem(
             icon: Icon(Icons.home),
             label: 'Inici',
           ),
-          BottomNavigationBarItem(
+          /*const BottomNavigationBarItem(
             icon: Icon(Icons.search),
             label: 'Cercar zona',
-          ),
-          BottomNavigationBarItem(
+          ),*/
+          const BottomNavigationBarItem(
             icon: Icon(Icons.bookmark),
             label: 'Reserves',
           ),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
             icon: Icon(Icons.history),
             label: 'Historial',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.chat),
-            label: 'Chat', // 👈 Añadido aquí
+            icon: ColorFiltered(
+              colorFilter: const ColorFilter.mode(
+                  Colors.black54,
+                  BlendMode.srcIn
+              ),
+              child: Image.asset('assets/images/logo_parkswap_IA_png.png', width: 24, height: 24),
+            ),
+            activeIcon: Image.asset('assets/images/logo_parkswap_IA_png.png', width: 24, height: 24),
+            label: 'Chat',
           ),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
             icon: Icon(Icons.person),
             label: 'Perfil',
           ),

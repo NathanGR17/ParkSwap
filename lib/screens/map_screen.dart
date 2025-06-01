@@ -10,6 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:parkswap/models/reservation_model.dart';
 import 'package:parkswap/auth/auth_provider.dart';
+import 'package:parkswap/pages/chat_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 
@@ -490,10 +491,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      //appBar: AppBar(
-        //title: const Text('INICI'),
-      //),
-      appBar: AppBar(
+      /*appBar: AppBar(
         backgroundColor: Colors.white,
         leading: Builder(
           builder: (context) => IconButton(
@@ -505,7 +503,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         ),
         title: const Text('INICI', style: TextStyle(color: Colors.black)),
         iconTheme: const IconThemeData(color: Colors.black),
-      ),
+      ),*/
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
@@ -531,7 +529,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.only(top: 40, left: 16, right: 16, bottom: 8),
+            padding: const EdgeInsets.only(top: 20, left: 16, right: 16, bottom: 8),
             child: Column(
               children: [
                 Row(

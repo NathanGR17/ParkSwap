@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
+import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
@@ -408,10 +410,16 @@ class ChatBubble extends StatelessWidget {
           color: message.isUser ? Theme.of(context).primaryColor : Colors.grey[200],
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Text(
-          message.text,
-          style: TextStyle(
-            color: message.isUser ? Colors.white : Colors.black,
+        child: MarkdownBody(
+          data: message.text,
+          styleSheet: MarkdownStyleSheet(
+            p: TextStyle(
+              color: message.isUser ? Colors.white : Colors.black,
+            ),
+            strong: TextStyle(
+              color: message.isUser ? Colors.white : Colors.black,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ),

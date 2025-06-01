@@ -3,79 +3,49 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class Reservation {
   final String id;
-  final String idUsuari;
+  final String userId;
+  final String vehicleId;
+  final String vehicleMatricula;
+  final String carrerId;
+  final String carrerNom;
   final DateTime horaInici;
   final DateTime horaFinal;
-  final String idVehicle;
-  final String idCarrer;
-  final String vehicleMatricula;
-  final String carrerNom;
-
-  // Camps locals opcionals
   final double pricePerHour;
-  int durationMinutes;
+  final double totalCost;
 
   Reservation({
     required this.id,
-    required this.idUsuari,
+    required this.userId,
+    required this.vehicleId,
+    required this.vehicleMatricula,
+    required this.carrerId,
+    required this.carrerNom,
     required this.horaInici,
     required this.horaFinal,
-    required this.idVehicle,
-    required this.idCarrer,
-    required this.vehicleMatricula,
-    required this.carrerNom,
-    this.pricePerHour = 5.0,
-    this.durationMinutes = 60,
+    required this.pricePerHour,
+    required this.totalCost,
   });
 
-  // Constructor des de Supabase
-  factory Reservation.fromMap(Map<String, dynamic> map) {
+  factory Reservation.fromJson(Map<String, dynamic> json) {
     return Reservation(
-      id: map['id'].toString(),
-      idUsuari: map['id_usuari'],
-      horaInici: DateTime.parse(map['hora_inici']),
-      horaFinal: DateTime.parse(map['hora_final']),
-      idVehicle: map['id_vehicle'],
-      idCarrer: map['id_carrer'],
-      vehicleMatricula: map['vehicle_matricula'] ?? '',
-      carrerNom: map['carrer_nom'] ?? '',
-      // Si vols, pots calcular pricePerHour i durationMinutes a partir de la resposta
+      id: json['id'],
+      userId: json['id_usuari'],
+      vehicleId: json['id_vehicle'],
+      vehicleMatricula: json['vehicle_matricula'] ?? '',
+      carrerId: json['id_carrer'],
+      carrerNom: json['carrer_nom'] ?? '',
+      horaInici: DateTime.parse(json['hora_inici']),
+      horaFinal: DateTime.parse(json['hora_final']),
+      pricePerHour: (json['preu_hora'] ?? 5.0).toDouble(),
+      totalCost: (json['preu_total'] ?? 0.0).toDouble(),
     );
-  }
-
-  String get endTime => horaFinal.toString().substring(11, 16);
-  String get totalCost {
-    final minuts = horaFinal.difference(horaInici).inMinutes;
-    return (pricePerHour * minuts / 60).toStringAsFixed(2);
   }
 }
 
 class ReservationProvider with ChangeNotifier {
-  List<Reservation> _history = [];
-  Reservation? _currentReservation;
-  final Map<String, int> _parkingSpots = {};
+  final List<Reservation> _reservations = [];
 
-  List<Reservation> get history => _history;
-  Reservation? get currentReservation => _currentReservation;
-
-  // Carrega historial des de Supabase
-  Future<void> fetchUserReservations(String userId) async {
-    final supabase = Supabase.instance.client;
-    final response = await supabase
-        .from('reserves_with_vehicle')
-        .select()
-        .eq('id_usuari', userId)
-        .order('hora_inici', ascending: false);
-
-    ///print('Resposta Supabase: $response');
-
-    if (response != null && response is List) {
-      _history = response
-          .map((r) => Reservation.fromMap(r as Map<String, dynamic>))
-          .toList();
-      notifyListeners();
-    }
-  }
+  List<Reservation> get reservations => [..._reservations];
 
   Future<void> addReservation({
     required String userId,
@@ -83,69 +53,55 @@ class ReservationProvider with ChangeNotifier {
     required String carrerId,
     required String vehicleMatricula,
     required String carrerNom,
-    int durationMinutes = 60,
-    double pricePerHour = 5.0,
+    DateTime? startTime,
+    int durationHours = 1,
   }) async {
-    final supabase = Supabase.instance.client;
-    final nowLocal = DateTime.now();
-    final nowUtc = nowLocal.toUtc();
-    //print('Hora local: $nowLocal');
-    //print('Hora UTC: $nowUtc');
-    final horaFinalUtc = nowUtc.add(Duration(minutes: durationMinutes));
+    final now = DateTime.now();
+    final startDateTime = startTime ?? now;
+    final endDateTime = startDateTime.add(Duration(hours: durationHours));
+    final pricePerHour = 5.0; // Precio fijo por hora
+    final totalCost = pricePerHour * durationHours;
 
-    final response = await supabase.from('reserves').insert({
-      'id_usuari': userId,
-      'id_vehicle': vehicleId,
-      'id_carrer': carrerId,
-      'hora_inici': nowUtc.toIso8601String(),
-      'hora_final': horaFinalUtc.toIso8601String(),
-    }).select().single();
+    try {
+      final supabase = Supabase.instance.client;
+      final response = await supabase.from('reserves').insert({
+        'id_usuari': userId,
+        'id_vehicle': vehicleId,
+        'id_carrer': carrerId,
+        'hora_inici': startDateTime.toUtc().toIso8601String(),
+        'hora_final': endDateTime.toUtc().toIso8601String(),
+      }).select();
 
-    //print('Respuesta de Supabase al guardar reserva: $response');
-
-    _currentReservation = Reservation(
-      id: response['id'],
-      idUsuari: userId,
-      horaInici: nowUtc,
-      horaFinal: horaFinalUtc,
-      idVehicle: vehicleId,
-      idCarrer: carrerId,
-      vehicleMatricula: vehicleMatricula,
-      carrerNom: carrerNom,
-      pricePerHour: pricePerHour,
-      durationMinutes: durationMinutes,
-    );
-    notifyListeners();
-  }
-
-  void addToHistory() {
-    if (_currentReservation != null) {
-      _history.insert(0, _currentReservation!);
-      _currentReservation = null;
-      notifyListeners();
+      if (response != null && response.isNotEmpty) {
+        final newReservation = Reservation.fromJson(response[0]);
+        _reservations.add(newReservation);
+        notifyListeners();
+      }
+    } catch (e) {
+      print('Error al crear reserva: $e');
+      rethrow;
     }
   }
 
-  void updateParkingSpots(String location, int spots) {
-    _parkingSpots[location] = spots;
-    notifyListeners();
-  }
+  Future<List<Reservation>> fetchUserReservations(String userId) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final response = await supabase
+          .from('reserves_with_vehicle')
+          .select()
+          .eq('id_usuari', userId)
+          .lt('hora_final', DateTime.now().toIso8601String()) // Solo reservas pasadas
+          .order('hora_inici', ascending: false);
 
-  int getAvailableSpots(String location) {
-    return _parkingSpots[location] ??
-        _history.where((r) => r.carrerNom == location).length;
-  }
+      final List<Reservation> pastReservations = [];
+      for (var item in response) {
+        pastReservations.add(Reservation.fromJson(item));
+      }
 
-  void extendReservation(int minutes) {
-    if (_currentReservation != null) {
-      _currentReservation!.durationMinutes += minutes;
-      notifyListeners();
-    }
-  }
-
-  void cancelReservation() {
-    if (_currentReservation != null) {
-      addToHistory();
+      return pastReservations;
+    } catch (e) {
+      print('Error al obtener historial de reservas: $e');
+      return [];
     }
   }
 }

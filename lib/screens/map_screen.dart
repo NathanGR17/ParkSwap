@@ -176,6 +176,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final user = authProvider.user;
 
+    // Valores por defecto
+    DateTime selectedDate = DateTime.now();
+    TimeOfDay selectedTime = TimeOfDay.now();
+    int durationHours = 1;
+
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Has d\'iniciar sessió per reservar.')),
@@ -183,48 +188,210 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       return;
     }
 
-    // Simulación de IDs (ajusta según tu lógica real)
-    final vehicleId = "aa2078a8-bad9-4bbd-af69-ed306bac2f00";
-    final carrerId = _availableStreets.indexOf(street) + 1;
-
-    showModalBottomSheet(
-      context: context,
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(street, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
-              const Text('Tarifa: 5€/hora'),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                  onPressed: () {
-                    reservationProvider.addReservation(
-                      userId: user.id,
-                      vehicleId: vehicleId,
-                      carrerId: carrerId.toString(),
-                      vehicleMatricula: user.licensePlate,
-                      carrerNom: street,
-                    );
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Reserva confirmada. Tens 10 minuts per arribar.')),
-                    );
-                    _iniciarTemporizadorReserva(null); // Inicia el temporizador sin un marcador específico
-                  },
-                  child: const Text('Ocupar', style: TextStyle(color: Colors.white)),
-                ),
-              ),
-            ],
-          ),
+    // Obtener el vehículo del usuario
+    _getUserVehicle(user.id).then((vehicle) {
+      if (vehicle == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Necessites tenir un vehicle registrat per reservar.')),
         );
-      },
-    );
+        return;
+      }
+
+      final vehicleId = vehicle['id'];
+      final matricula = vehicle['matricula'];
+      final carrerId = _availableStreets.indexOf(street) + 1;
+
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true, // Para que sea más alto
+        builder: (context) {
+          return StatefulBuilder(
+              builder: (context, setModalState) {
+                return Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(street, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+                      const Text('Tarifa: 5€/hora'),
+                      const SizedBox(height: 20),
+
+                      // Selector de fecha
+                      ListTile(
+                        leading: const Icon(Icons.calendar_today),
+                        title: Text('Data: ${selectedDate.day}/${selectedDate.month}/${selectedDate.year}'),
+                        onTap: () async {
+                          final pickedDate = await showDatePicker(
+                            context: context,
+                            initialDate: selectedDate,
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime.now().add(const Duration(days: 7)),
+                          );
+                          if (pickedDate != null) {
+                            setModalState(() {
+                              selectedDate = pickedDate;
+                            });
+                          }
+                        },
+                      ),
+
+                      // Selector de hora
+                      ListTile(
+                        leading: const Icon(Icons.access_time),
+                        title: Text('Hora: ${selectedTime.format(context)}'),
+                        onTap: () async {
+                          final pickedTime = await showTimePicker(
+                            context: context,
+                            initialTime: selectedTime,
+                          );
+                          if (pickedTime != null) {
+                            setModalState(() {
+                              selectedTime = pickedTime;
+                            });
+                          }
+                        },
+                      ),
+
+                      // Selector de duración
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Duració: '),
+                          DropdownButton<int>(
+                            value: durationHours,
+                            items: List.generate(6, (i) => i + 1)
+                                .map((hours) => DropdownMenuItem(
+                              value: hours,
+                              child: Text('$hours hores'),
+                            ))
+                                .toList(),
+                            onChanged: (value) {
+                              if (value != null) {
+                                setModalState(() {
+                                  durationHours = value;
+                                });
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 10),
+                      Text('Preu total: ${durationHours * 5}€',
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 20),
+
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                          onPressed: () async {
+                            // Verificar disponibilidad
+                            final isAvailable = await _checkAvailability(
+                                carrerId.toString(),
+                                selectedDate,
+                                selectedTime,
+                                durationHours
+                            );
+
+                            if (!isAvailable) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('No hi ha places disponibles en aquest horari.'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                              return;
+                            }
+
+                            // Crear la reserva
+                            final startDateTime = DateTime(
+                              selectedDate.year,
+                              selectedDate.month,
+                              selectedDate.day,
+                              selectedTime.hour,
+                              selectedTime.minute,
+                            );
+
+                            reservationProvider.addReservation(
+                              userId: user.id,
+                              vehicleId: vehicleId,
+                              carrerId: carrerId.toString(),
+                              vehicleMatricula: matricula,
+                              carrerNom: street,
+                              startTime: startDateTime,
+                              durationHours: durationHours,
+                            );
+
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Reserva confirmada.'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          },
+                          child: const Text('Reservar', style: TextStyle(color: Colors.white)),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+          );
+        },
+      );
+    });
+  }
+
+// Método para obtener el vehículo del usuario
+  Future<Map<String, dynamic>?> _getUserVehicle(String userId) async {
+    try {
+      final result = await Supabase.instance.client
+          .from('vehicles')
+          .select()
+          .eq('id_usuari', userId)
+          .maybeSingle();
+
+      return result;
+    } catch (e) {
+      print('Error al obtener vehículo: $e');
+      return null;
+    }
+  }
+
+// Método para verificar disponibilidad
+  Future<bool> _checkAvailability(
+      String carrerId,
+      DateTime date,
+      TimeOfDay time,
+      int duration) async {
+    try {
+      // Construir fecha y hora de inicio/fin
+      final startDateTime = DateTime(
+          date.year,
+          date.month,
+          date.day,
+          time.hour,
+          time.minute
+      );
+      final endDateTime = startDateTime.add(Duration(hours: duration));
+
+      // Consultar reservas existentes para este carrer que se solapen
+      final result = await Supabase.instance.client
+          .from('reserves')
+          .select('id')
+          .eq('id_carrer', carrerId)
+          .or('hora_inici.lte.${endDateTime.toIso8601String()},hora_final.gte.${startDateTime.toIso8601String()}')
+          .limit(1);
+
+      // Si hay resultados, significa que hay solapamiento (no disponible)
+      return (result as List).isEmpty;
+    } catch (e) {
+      print('Error al verificar disponibilidad: $e');
+      return false; // Por seguridad, asumimos que no está disponible
+    }
   }
 
   @override

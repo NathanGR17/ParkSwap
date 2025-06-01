@@ -12,6 +12,7 @@ import 'package:parkswap/models/reservation_model.dart';
 import 'package:parkswap/auth/auth_provider.dart';
 import 'package:parkswap/pages/chat_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
 
 
 class PoiMarker extends Marker {
@@ -176,11 +177,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final user = authProvider.user;
 
-    // Valores por defecto
-    DateTime selectedDate = DateTime.now();
-    TimeOfDay selectedTime = TimeOfDay.now();
-    int durationHours = 1;
-
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Has d\'iniciar sessió per reservar.')),
@@ -188,161 +184,205 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       return;
     }
 
-    // Obtener el vehículo del usuario
-    _getUserVehicle(user.id).then((vehicle) {
-      if (vehicle == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Necessites tenir un vehicle registrat per reservar.')),
-        );
-        return;
-      }
+    // Simulación de IDs (ajusta según tu lógica real)
+    final vehicleId = "aa2078a8-bad9-4bbd-af69-ed306bac2f00";
+    final carrerId = _availableStreets.indexOf(street) + 1;
 
-      final vehicleId = vehicle['id'];
-      final matricula = vehicle['matricula'];
-      final carrerId = _availableStreets.indexOf(street) + 1;
+    // Valores por defecto para la reserva
+    DateTime selectedDate = DateTime.now();
+    TimeOfDay selectedTime = TimeOfDay.now();
+    int durationHours = 1;
 
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true, // Para que sea más alto
-        builder: (context) {
-          return StatefulBuilder(
-              builder: (context, setModalState) {
-                return Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(street, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 10),
-                      const Text('Tarifa: 5€/hora'),
-                      const SizedBox(height: 20),
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true, // Para que el modal sea más alto
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(street, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 10),
+                  const Text('Tarifa: 5€/hora'),
+                  const SizedBox(height: 20),
 
-                      // Selector de fecha
-                      ListTile(
-                        leading: const Icon(Icons.calendar_today),
-                        title: Text('Data: ${selectedDate.day}/${selectedDate.month}/${selectedDate.year}'),
-                        onTap: () async {
-                          final pickedDate = await showDatePicker(
-                            context: context,
-                            initialDate: selectedDate,
-                            firstDate: DateTime.now(),
-                            lastDate: DateTime.now().add(const Duration(days: 7)),
-                          );
-                          if (pickedDate != null) {
-                            setModalState(() {
-                              selectedDate = pickedDate;
-                            });
-                          }
-                        },
-                      ),
-
-                      // Selector de hora
-                      ListTile(
-                        leading: const Icon(Icons.access_time),
-                        title: Text('Hora: ${selectedTime.format(context)}'),
-                        onTap: () async {
-                          final pickedTime = await showTimePicker(
-                            context: context,
-                            initialTime: selectedTime,
-                          );
-                          if (pickedTime != null) {
-                            setModalState(() {
-                              selectedTime = pickedTime;
-                            });
-                          }
-                        },
-                      ),
-
-                      // Selector de duración
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Duració: '),
-                          DropdownButton<int>(
-                            value: durationHours,
-                            items: List.generate(6, (i) => i + 1)
-                                .map((hours) => DropdownMenuItem(
-                              value: hours,
-                              child: Text('$hours hores'),
-                            ))
-                                .toList(),
-                            onChanged: (value) {
-                              if (value != null) {
-                                setModalState(() {
-                                  durationHours = value;
-                                });
-                              }
-                            },
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 10),
-                      Text('Preu total: ${durationHours * 5}€',
-                          style: const TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 20),
-
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                          onPressed: () async {
-                            // Verificar disponibilidad
-                            final isAvailable = await _checkAvailability(
-                                carrerId.toString(),
-                                selectedDate,
-                                selectedTime,
-                                durationHours
-                            );
-
-                            if (!isAvailable) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('No hi ha places disponibles en aquest horari.'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                              return;
-                            }
-
-                            // Crear la reserva
-                            final startDateTime = DateTime(
-                              selectedDate.year,
-                              selectedDate.month,
-                              selectedDate.day,
-                              selectedTime.hour,
-                              selectedTime.minute,
-                            );
-
-                            reservationProvider.addReservation(
-                              userId: user.id,
-                              vehicleId: vehicleId,
-                              carrerId: carrerId.toString(),
-                              vehicleMatricula: matricula,
-                              carrerNom: street,
-                              startTime: startDateTime,
-                              durationHours: durationHours,
-                            );
-
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Reserva confirmada.'),
-                                backgroundColor: Colors.green,
-                              ),
-                            );
-                          },
-                          child: const Text('Reservar', style: TextStyle(color: Colors.white)),
-                        ),
-                      ),
-                    ],
+                  // Selector de fecha
+                  ListTile(
+                    leading: const Icon(Icons.calendar_today),
+                    title: const Text('Data'),
+                    subtitle: Text('${selectedDate.day}/${selectedDate.month}/${selectedDate.year}'),
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate,
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(const Duration(days: 7)),
+                      );
+                      if (picked != null) {
+                        setState(() {
+                          selectedDate = picked;
+                        });
+                      }
+                    },
                   ),
-                );
-              }
-          );
-        },
-      );
-    });
+
+                  // Selector de hora
+                  ListTile(
+                    leading: const Icon(Icons.access_time),
+                    title: const Text('Hora'),
+                    subtitle: Text('${selectedTime.hour}:${selectedTime.minute.toString().padLeft(2, '0')}'),
+                    onTap: () async {
+                      final picked = await showTimePicker(
+                        context: context,
+                        initialTime: selectedTime,
+                      );
+                      if (picked != null) {
+                        setState(() {
+                          selectedTime = picked;
+                        });
+                      }
+                    },
+                  ),
+
+                  // Selector de duración
+                  ListTile(
+                    leading: const Icon(Icons.timer),
+                    title: const Text('Durada'),
+                    subtitle: Text('$durationHours hores'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.remove),
+                          onPressed: durationHours > 1
+                              ? () => setState(() => durationHours--)
+                              : null,
+                        ),
+                        Text('$durationHours'),
+                        IconButton(
+                          icon: const Icon(Icons.add),
+                          onPressed: durationHours < 6
+                              ? () => setState(() => durationHours++)
+                              : null,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                      onPressed: () async {
+                        // Verificar disponibilidad
+                        final bool available = await _checkAvailability(
+                            carrerId.toString(),
+                            selectedDate,
+                            selectedTime,
+                            durationHours
+                        );
+
+                        if (!available) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('No hi ha places disponibles en aquesta franja horària.'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+
+                        // Crear DateTime para la hora de inicio
+                        final startTime = DateTime(
+                          selectedDate.year,
+                          selectedDate.month,
+                          selectedDate.day,
+                          selectedTime.hour,
+                          selectedTime.minute,
+                        );
+
+                        // Realizar la reserva
+                        reservationProvider.addReservation(
+                          userId: user.id,
+                          vehicleId: vehicleId,
+                          carrerId: carrerId.toString(),
+                          vehicleMatricula: user.licensePlate,
+                          carrerNom: street,
+                          startTime: startTime,
+                          durationHours: durationHours,
+                        );
+
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Reserva confirmada.')),
+                        );
+                      },
+                      child: const Text('Reservar', style: TextStyle(color: Colors.white)),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+// Método para verificar disponibilidad
+  Future<bool> _checkAvailability(
+      String carrerId,
+      DateTime selectedDate,
+      TimeOfDay selectedTime,
+      int durationHours
+      ) async {
+    try {
+      final supabase = Supabase.instance.client;
+
+      // Crear la fecha de inicio y fin para la reserva solicitada
+      final startDateTime = DateTime(
+        selectedDate.year,
+        selectedDate.month,
+        selectedDate.day,
+        selectedTime.hour,
+        selectedTime.minute,
+      ).toUtc();
+
+      final endDateTime = startDateTime.add(Duration(hours: durationHours));
+
+      // Consultar todas las reservas para esta calle que puedan solaparse
+      final response = await supabase
+          .from('reserves')
+          .select('*, carrers!inner(*)')
+          .eq('id_carrer', carrerId)
+          .or('hora_inici.lte.${endDateTime.toIso8601String()},hora_final.gte.${startDateTime.toIso8601String()}');
+
+      if (response == null) return true;
+
+      // Obtener información sobre la cantidad de plazas en esta calle
+      final streetInfoResponse = await supabase
+          .from('carrers')
+          .select('places_disponibles')
+          .eq('id', carrerId)
+          .single();
+
+      final totalPlazas = streetInfoResponse['places_disponibles'] ?? 1;
+
+      // Contar cuántas reservas se solapan con nuestra franja horaria
+      final reservasExistentes = (response as List).length;
+
+      // Si hay menos reservas que plazas, hay disponibilidad
+      return reservasExistentes < totalPlazas;
+
+    } catch (e) {
+      print('Error al verificar disponibilidad: $e');
+      return false;
+    }
   }
 
 // Método para obtener el vehículo del usuario
@@ -361,38 +401,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     }
   }
 
-// Método para verificar disponibilidad
-  Future<bool> _checkAvailability(
-      String carrerId,
-      DateTime date,
-      TimeOfDay time,
-      int duration) async {
-    try {
-      // Construir fecha y hora de inicio/fin
-      final startDateTime = DateTime(
-          date.year,
-          date.month,
-          date.day,
-          time.hour,
-          time.minute
-      );
-      final endDateTime = startDateTime.add(Duration(hours: duration));
-
-      // Consultar reservas existentes para este carrer que se solapen
-      final result = await Supabase.instance.client
-          .from('reserves')
-          .select('id')
-          .eq('id_carrer', carrerId)
-          .or('hora_inici.lte.${endDateTime.toIso8601String()},hora_final.gte.${startDateTime.toIso8601String()}')
-          .limit(1);
-
-      // Si hay resultados, significa que hay solapamiento (no disponible)
-      return (result as List).isEmpty;
-    } catch (e) {
-      print('Error al verificar disponibilidad: $e');
-      return false; // Por seguridad, asumimos que no está disponible
-    }
-  }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -541,46 +549,64 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     popupController.hideAllPopups();
   }
 
-  void _iniciarTemporizadorReserva(PoiMarker? marker) {
+  void _iniciarTemporizadorReserva(PoiMarker? marker, DateTime endTime) {
+    // Timer para actualizar el contador
+    Timer? timer;
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Reserva activa'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('La teva plaça està reservada per:'),
-              const SizedBox(height: 10),
-              TweenAnimationBuilder(
-                duration: const Duration(minutes: 10),
-                tween: Tween(begin: 10.0, end: 0.0),
-                builder: (context, value, _) {
-                  final minutes = value.floor();
-                  final seconds = ((value - minutes) * 60).floor();
-                  return Text(
-                    '$minutes:${seconds.toString().padLeft(2, '0')} minuts',
+        return StatefulBuilder(
+          builder: (context, setState) {
+            // Iniciar timer al mostrar el diálogo
+            timer ??= Timer.periodic(const Duration(seconds: 1), (_) {
+              setState(() {}); // Forzar reconstrucción para actualizar tiempo
+            });
+
+            // Calcular tiempo restante actual
+            final now = DateTime.now();
+            final remaining = endTime.difference(now);
+            final hours = remaining.inHours;
+            final minutes = remaining.inMinutes.remainder(60);
+            final seconds = remaining.inSeconds.remainder(60);
+
+            // Formatear tiempo restante
+            final remainingText = '${hours}h ${minutes}m ${seconds}s';
+
+            return AlertDialog(
+              title: const Text('Temps restant de reserva'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Carrer: ${marker?.title ?? ""}'),
+                  const SizedBox(height: 10),
+                  Text(
+                    remainingText,
                     style: const TextStyle(
-                        fontSize: 32, fontWeight: FontWeight.bold),
-                  );
-                },
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                popupController.hideAllPopups();
-                poiPopupController.hideAllPopups();
-              },
-              child: const Text('Tancar'),
-            ),
-          ],
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    timer?.cancel(); // Cancelar timer al cerrar
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Tancar'),
+                ),
+              ],
+            );
+          },
         );
       },
-    );
+    ).then((_) {
+      // Asegurar cancelación del timer si se cierra el diálogo
+      timer?.cancel();
+    });
   }
 
   void _reservarPlaza(BuildContext context, PoiMarker marker) async {
@@ -633,6 +659,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       final carrerId = marker.carrerId;
 
       try {
+        final DateTime startTime = DateTime.now();
+        final DateTime endTime = startTime.add(const Duration(hours: 1));
         await reservationProvider.addReservation(
           userId: user.id,
           vehicleId: vehicleId,
@@ -645,7 +673,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         if (!mounted) return;
         await _fetchParkingDataFromSupabase();
         if (!mounted) return;
-        _iniciarTemporizadorReserva(marker);
+        _iniciarTemporizadorReserva(marker, endTime);
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(

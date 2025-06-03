@@ -82,6 +82,40 @@ class ReservationProvider with ChangeNotifier {
       rethrow;
     }
   }
+  Future<void> extendReservation(String id, int minuts) async {
+    // Obté la reserva actual
+    final response = await Supabase.instance.client
+        .from('reserves')
+        .select('hora_final')
+        .eq('id', id)
+        .single();
+
+    final currentEnd = DateTime.parse(response['hora_final']);
+    final newEnd = currentEnd.add(Duration(minutes: minuts));
+
+    await Supabase.instance.client
+        .from('reserves')
+        .update({'hora_final': newEnd.toUtc().toIso8601String()})
+        .eq('id', id);
+
+
+    notifyListeners(); // Refresca la llista
+  }
+
+  Future<void> reportIncidence({
+    required String userId,
+    required String reservaId,
+    required String descripcio,
+  }) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    await Supabase.instance.client.from('incidencies').insert({
+      'usuari_id': userId,
+      'reserva_id': reservaId,
+      'descripcio': descripcio,
+      'data_incidencia': now,
+      'estat': 'Pendent',
+    });
+  }
 
   Future<List<Reservation>> fetchUserReservations(String userId) async {
     try {

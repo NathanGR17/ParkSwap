@@ -77,6 +77,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   final List<PoiMarker> poiMarkers = [];
   final PopupController poiPopupController = PopupController();
   final List<ParkingMarker> markers = [];
+  bool _tapProcessed = false;
 
   final TextEditingController _searchController = TextEditingController();
   bool _showRecentSearches = false;
@@ -811,11 +812,12 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                 initialCenter: LatLng(41.39726788435298, 2.1971287495157217),
                 initialZoom: 15,
                 onTap: (tapPosition, point) {
-                  // Primero oculta los popups existentes
+                  _tapProcessed = false;
+                  // Sempre tanca els popups (si n'hi ha)
                   popupController.hideAllPopups();
                   poiPopupController.hideAllPopups();
 
-                  // Luego pregunta si desea añadir un marcador en este punto
+                  // Mostra el diàleg per afegir marcador
                   showDialog<bool>(
                     context: context,
                     builder: (context) => AlertDialog(

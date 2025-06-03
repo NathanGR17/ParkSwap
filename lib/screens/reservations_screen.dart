@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:parkswap/auth/auth_provider.dart';
-
+import 'package:parkswap/models/reservation_model.dart';
 class ReservationsScreen extends StatefulWidget {
   const ReservationsScreen({super.key});
 
@@ -89,34 +89,124 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
                     context: context,
                     builder: (_) => AlertDialog(
                       title: const Text('Detalls de la reserva'),
-                      content: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Carrer: ${carrer?['nom'] ?? res['carrer_nom']}'),
-                          Text('Matrícula: $matricula'),
-                          Text('Hora inici: $startStr'),
-                          Text('Hora final: $endStr'),
-                          Text('Temps restant: $remainingStr'),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: ElevatedButton(
-                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                                  onPressed: () async {
-                                    await _deleteReservation(res['id'].toString());
-                                    Navigator.pop(context);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Reserva cancel·lada')),
-                                    );
-                                  },
-                                  child: const Text('Cancel·lar reserva', style: TextStyle(color: Colors.white)),
+                      content: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Carrer: ${carrer?['nom'] ?? res['carrer_nom']}'),
+                            Text('Matrícula: $matricula'),
+                            Text('Hora inici: $startStr'),
+                            Text('Hora final: $endStr'),
+                            Text('Temps restant: $remainingStr'),
+                            const SizedBox(height: 20),
+                            const Text('Accions disponibles:', style: TextStyle(fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: () async {
+                                      await Provider.of<ReservationProvider>(context, listen: false)
+                                          .extendReservation(res['id'].toString(), 30);
+                                      setState(() {});
+                                      Navigator.pop(context);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Reserva ampliada 30 minuts')),
+                                      );
+                                    },
+                                    child: const Text('+30 min'),
+                                  ),
                                 ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: () async {
+                                      await Provider.of<ReservationProvider>(context, listen: false)
+                                          .extendReservation(res['id'].toString(), 60);
+                                      setState(() {});
+                                      Navigator.pop(context);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Reserva ampliada 1 hora')),
+                                      );
+                                    },
+                                    child: const Text('+1 hora'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                icon: const Icon(Icons.help_outline),
+                                label: const Text('Ajuda o incidència'),
+                                // Dins del teu onPressed de 'Ajuda o incidència':
+                                onPressed: () {
+                                  final TextEditingController _controller = TextEditingController();
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: const Text('Incidència'),
+                                      content: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Text('Descriu el problema:'),
+                                          const SizedBox(height: 10),
+                                          TextField(
+                                            controller: _controller,
+                                            maxLines: 3,
+                                            decoration: const InputDecoration(
+                                              border: OutlineInputBorder(),
+                                              hintText: 'Escriu aquí la teva incidència',
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(context),
+                                          child: const Text('Cancel·lar'),
+                                        ),
+                                        ElevatedButton(
+                                          onPressed: () async {
+                                            final text = _controller.text;
+                                            final userId = Provider.of<AuthProvider>(context, listen: false).user?.id ?? '';
+                                            final reservaId = res['id'].toString();
+                                            await Provider.of<ReservationProvider>(context, listen: false)
+                                                .reportIncidence(userId: userId, reservaId: reservaId, descripcio: text);
+                                            Navigator.pop(context);
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(content: Text('Incidència reportada')),
+                                            );
+                                          },
+                                          child: const Text('Enviar'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
                               ),
-                            ],
-                          ),
-                        ],
+                            ),
+                            const SizedBox(height: 16),
+                            Center(
+                              child: TextButton.icon(
+                                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                label: const Text(
+                                  'Cancel·lar reserva',
+                                  style: TextStyle(color: Colors.red),
+                                ),
+                                onPressed: () async {
+                                  await _deleteReservation(res['id'].toString());
+                                  Navigator.pop(context);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Reserva cancel·lada')),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   );

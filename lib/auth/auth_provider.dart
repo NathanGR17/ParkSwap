@@ -51,6 +51,7 @@ class AuthProvider with ChangeNotifier {
     );
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('userId', id);
+    await clearChatMessages();
     notifyListeners();
   }
 
@@ -88,6 +89,7 @@ class AuthProvider with ChangeNotifier {
       phone: phone,
       licensePlate: licensePlate,
     );
+    await clearChatMessages();
     notifyListeners();
   }
 
@@ -101,8 +103,16 @@ class AuthProvider with ChangeNotifier {
     _cardInfo = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('userId');
+    await clearChatMessages();
     notifyListeners();
   }
+
+  // Metodo para limpiar los mensajes del chat
+  Future<void> clearChatMessages() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('chat_messages');
+  }
+
   // Metodo para intentar restaurar sesión:
   Future<void> tryAutoLogin() async {
     final prefs = await SharedPreferences.getInstance();

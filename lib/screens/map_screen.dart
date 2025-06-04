@@ -71,6 +71,29 @@ class MapScreen extends StatefulWidget {
   State<MapScreen> createState() => _MapScreenState();
 }
 
+// Primero, añade esta clase para el marcador de tu ubicación
+class UserLocationMarker extends Marker {
+  UserLocationMarker({
+    required LatLng point,
+  }) : super(
+    point: point,
+    width: 30,
+    height: 30,
+    child: Container(
+      decoration: BoxDecoration(
+        color: Colors.blue.withOpacity(0.5),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2),
+      ),
+      child: const Icon(
+        Icons.my_location,
+        color: Colors.white,
+        size: 18,
+      ),
+    ),
+  );
+}
+
 class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   final mapController = MapController();
   final popupController = PopupController();
@@ -78,6 +101,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   final PopupController poiPopupController = PopupController();
   final List<ParkingMarker> markers = [];
   bool _tapProcessed = false;
+  UserLocationMarker? userLocationMarker;
+  Timer? _locationTimer;
 
   final TextEditingController _searchController = TextEditingController();
   bool _showRecentSearches = false;
@@ -95,10 +120,18 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _checkLocationPermission();
+    _checkLocationPermission().then((_) {
+      _updateUserLocation(); // Ubicación inicial
+
+      // Actualizar ubicación cada 15 segundos
+      _locationTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+        _updateUserLocation(showSnackbar: false);
+      });
+    });
+
     _fetchParkingDataFromSupabase();
     _loadRecentSearches();
-    _loadParkingMarker(); // Añade esta línea
+    _loadParkingMarker();
 
     _searchController.addListener(() {
       setState(() {
@@ -136,11 +169,45 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _locationTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     super.dispose();
   }
+  Future<void> _updateUserLocation({bool showSnackbar = true}) async {
+    try {
+      final position = await Geolocator.getCurrentPosition();
+      final userLocation = LatLng(position.latitude, position.longitude);
 
+      setState(() {
+        userLocationMarker = UserLocationMarker(point: userLocation);
+      });
+    } catch (e) {
+      if (showSnackbar && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error amb la ubicació: $e')),
+        );
+      }
+      print('Error al obtener ubicación: $e');
+    }
+  }
+
+// Actualiza el método existente para centrar el mapa en tu ubicación
+  Future<void> _getCurrentLocation() async {
+    try {
+      await _updateUserLocation();
+
+      if (userLocationMarker != null && mounted) {
+        mapController.move(userLocationMarker!.point, 17);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error amb la ubicació: $e')),
+        );
+      }
+    }
+  }
   void _searchStreet(String street) async {
     setState(() {
       _showRecentSearches = false;
@@ -483,38 +550,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _getCurrentLocation() async {
-    try {
-      final position = await Geolocator.getCurrentPosition();
-      final currentLocation = LatLng(position.latitude, position.longitude);
-      mapController.move(currentLocation, 17);
-      final shouldAdd = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Afegir marcador'),
-          content: const Text('Vols marcar la teva ubicació actual?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Afegir'),
-            ),
-          ],
-        ),
-      );
-
-      if (shouldAdd == true && mounted) _addMarkerAt(currentLocation);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error amb la ubicació: $e')),
-      );
-    }
-  }
-
   void _addMarkerAt(LatLng position) async {
     final now = DateTime.now();
     final newMarker = ParkingMarker(
@@ -761,19 +796,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      /*appBar: AppBar(
-        backgroundColor: Colors.white,
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: Image.asset('assets/images/logo_parkswap_IA_png.png'),
-            onPressed: () {
-              Scaffold.of(context).openDrawer(); // Abre el Drawer
-            },
-          ),
-        ),
-        title: const Text('INICI', style: TextStyle(color: Colors.black)),
-        iconTheme: const IconThemeData(color: Colors.black),
-      ),*/
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
@@ -808,22 +830,25 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                       child: TextField(
                         controller: _searchController,
                         decoration: InputDecoration(
-                          hintText: 'Cerca una adreça o zona',
+                          hintText: 'Cercar carrer...',
                           prefixIcon: const Icon(Icons.search),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          suffixIcon: IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () => _searchController.clear(),
+                            borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        onSubmitted: (value) => _searchStreet(value),
+                        onSubmitted: (value) {
+                          _searchStreet(value);
+                        },
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.my_location),
-                      onPressed: _getCurrentLocation,
+                      icon: const Icon(Icons.search),
+                      onPressed: () {
+                        if (_searchController.text.isNotEmpty) {
+                          _searchStreet(_searchController.text);
+                        }
+                      },
+                      tooltip: 'Cercar',
                     ),
                   ],
                 ),
@@ -831,186 +856,185 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                   Container(
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.3),
-                          spreadRadius: 1,
-                          blurRadius: 5,
-                        ),
-                      ],
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Padding(
-                          padding: EdgeInsets.all(8.0),
-                          child: Text(
-                            'Recents',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        _recentSearches.isEmpty
-                            ? const Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: Text('No hi ha cerques recents'),
-                        )
-                            : ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _recentSearches.length,
-                          itemBuilder: (context, index) {
-                            return ListTile(
-                              leading: const Icon(Icons.history),
-                              title: Text(_recentSearches[index]),
-                              onTap: () {
-                                _searchController.text = _recentSearches[index];
-                                setState(() {
-                                  _showRecentSearches = false;
-                                });
-                                _searchStreet(_recentSearches[index]);
-                              },
-                            );
+                      children: _recentSearches.map((search) {
+                        return ListTile(
+                          leading: const Icon(Icons.history),
+                          title: Text(search),
+                          onTap: () {
+                            _searchController.text = search;
+                            _searchStreet(search);
                           },
-                        ),
-                      ],
+                        );
+                      }).toList(),
                     ),
                   ),
               ],
             ),
           ),
           Expanded(
-            child: FlutterMap(
-              mapController: mapController,
-              options: MapOptions(
-                initialCenter: LatLng(41.39726788435298, 2.1971287495157217),
-                initialZoom: 15,
-                onTap: (tapPosition, point) {
-                  _tapProcessed = false;
-                  // Sempre tanca els popups (si n'hi ha)
-                  popupController.hideAllPopups();
-                  poiPopupController.hideAllPopups();
-
-                  // Mostra el diàleg per afegir marcador
-                  showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Afegir marcador'),
-                      content: const Text('Vols marcar aquesta ubicació com el teu aparcament?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancelar'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          child: const Text('Afegir'),
-                        ),
-                      ],
-                    ),
-                  ).then((shouldAdd) {
-                    if (shouldAdd == true) {
-                      _addMarkerAt(point);
-                    }
-                  });
-                },
-              ),
+            child: Stack(
               children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.example.app',
-                ),
-                PopupMarkerLayer(
-                  options: PopupMarkerLayerOptions(
-                    markers: poiMarkers,
-                    popupController: poiPopupController,
-                    popupDisplayOptions: PopupDisplayOptions(
-                      builder: (BuildContext context, Marker marker) {
-                        if (marker is PoiMarker) {
-                          return SizedBox(
-                            width: 200, // Limita el ancho del popup
-                            child: Card(
-                              child: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(marker.title,
-                                      style: const TextStyle(fontWeight: FontWeight.bold),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                    Text(marker.description,
-                                      textAlign: TextAlign.center,
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Row(
+                FlutterMap(
+                  mapController: mapController,
+                  options: MapOptions(
+                    initialCenter: LatLng(41.39726788435298, 2.1971287495157217),
+                    initialZoom: 15,
+                    onTap: (tapPosition, point) {
+                      _tapProcessed = false;
+                      // Siempre cierra los popups (si los hay)
+                      popupController.hideAllPopups();
+                      poiPopupController.hideAllPopups();
+
+                      // Muestra el diálogo para añadir marcador
+                      showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Afegir marcador'),
+                          content: const Text('Vols marcar aquesta ubicació com el teu aparcament?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Cancelar'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text('Afegir'),
+                            ),
+                          ],
+                        ),
+                      ).then((shouldAdd) {
+                        if (shouldAdd == true) {
+                          _addMarkerAt(point);
+                        }
+                      });
+                    },
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.example.app',
+                    ),
+                    // Capa para la ubicación del usuario
+                    MarkerLayer(
+                      markers: userLocationMarker != null ? [userLocationMarker!] : [],
+                    ),
+                    // Resto de capas existentes
+                    PopupMarkerLayer(
+                      options: PopupMarkerLayerOptions(
+                        markers: poiMarkers,
+                        popupController: poiPopupController,
+                        popupDisplayOptions: PopupDisplayOptions(
+                          builder: (BuildContext context, Marker marker) {
+                            if (marker is PoiMarker) {
+                              return SizedBox(
+                                width: 200,
+                                child: Card(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        // Botón Cancelar
-                                        Expanded(
-                                          child: ElevatedButton(
-                                            onPressed: () {
-                                              poiPopupController.hideAllPopups();
-                                            },
-                                            style: ElevatedButton.styleFrom(
-                                              padding: const EdgeInsets.symmetric(vertical: 8),
-                                            ),
-                                            child: const Text('Cancelar', style: TextStyle(fontSize: 12)),
+                                        Text(
+                                          marker.title,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
                                           ),
+                                          textAlign: TextAlign.center,
                                         ),
-                                        const SizedBox(width: 8),
-                                        // Botón Reservar
-                                        Expanded(
-                                          child: ElevatedButton(
-                                            onPressed: () => _reservarPlaza(context, marker),
-                                            style: ElevatedButton.styleFrom(
-                                              padding: const EdgeInsets.symmetric(vertical: 8),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          marker.description,
+                                          textAlign: TextAlign.center,
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                          children: [
+                                            ElevatedButton(
+                                              onPressed: () {
+                                                _reservarPlaza(context, marker);
+                                              },
+                                              style: ElevatedButton.styleFrom(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              ),
+                                              child: const Text(
+                                                'Reservar',
+                                                style: TextStyle(fontSize: 12),
+                                              ),
                                             ),
-                                            child: const Text('Reservar', style: TextStyle(fontSize: 12)),
-                                          ),
+                                            TextButton(
+                                              onPressed: () {
+                                                poiPopupController.hidePopupsOnlyFor([marker]);
+                                              },
+                                              style: TextButton.styleFrom(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              ),
+                                              child: const Text(
+                                                'Cancelar',
+                                                style: TextStyle(fontSize: 12),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ],
                                     ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
-                    ),
-                  ),
-                ),
-                PopupMarkerLayer(
-                  options: PopupMarkerLayerOptions(
-                    markers: markers,
-                    popupController: popupController,
-                    popupDisplayOptions: PopupDisplayOptions(
-                      builder: (BuildContext context, Marker marker) {
-                        if (marker is ParkingMarker) {
-                          return Card(
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Text('Has marcat aquesta ubicació'),
-                                  Text('Hora: ${marker.markedTime.hour}:${marker.markedTime.minute.toString().padLeft(2, '0')}'),
-                                  const SizedBox(height: 8),
-                                  ElevatedButton(
-                                    onPressed: () {
-                                      _removeMarker(marker as ParkingMarker);
-                                    },
-                                    child: const Text('Eliminar marcador'),
                                   ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
+                                ),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                      ),
                     ),
+                    PopupMarkerLayer(
+                      options: PopupMarkerLayerOptions(
+                        markers: markers,
+                        popupController: popupController,
+                        popupDisplayOptions: PopupDisplayOptions(
+                          builder: (BuildContext context, Marker marker) {
+                            if (marker is ParkingMarker) {
+                              return Card(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text('Has marcat aquesta ubicació'),
+                                      Text('Hora: ${marker.markedTime.hour}:${marker.markedTime.minute.toString().padLeft(2, '0')}'),
+                                      const SizedBox(height: 8),
+                                      ElevatedButton(
+                                        onPressed: () {
+                                          _removeMarker(marker as ParkingMarker);
+                                        },
+                                        child: const Text('Eliminar marcador'),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                // Botón para centrar en la ubicación actual
+                Positioned(
+                  right: 16,
+                  bottom: 50,
+                  child: FloatingActionButton(
+                    mini: true,
+                    backgroundColor: Colors.white,
+                    onPressed: _getCurrentLocation,
+                    child: const Icon(Icons.my_location, color: Colors.blue),
                   ),
                 ),
               ],

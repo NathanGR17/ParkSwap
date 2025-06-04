@@ -58,7 +58,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 12),
             _buildInfoCard([
               _buildInfoRow(Icons.phone, 'Telèfon', user.phone),
-              _buildInfoRow(Icons.directions_car, 'Matrícula', user.licensePlate),
+              _buildInfoRow(Icons.directions_car, 'Matrícula', user.licensePlate ?? '-'),
               _buildInfoRow(Icons.credit_card, 'Mètode de pagament',
                   authProvider.cardInfo ?? 'Cap mètode afegit'),
             ]),

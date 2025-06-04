@@ -275,56 +275,80 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                   ),
 
                   const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                      onPressed: () async {
+                  Row(
+                    children: [
+                      // Botón para cancelar
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancelar'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      // Botón para reservar
+                      Expanded(
+                        child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                        onPressed: () async {
+
+                        final userVehicle = await _getUserVehicle(user.id);
+                        if (userVehicle == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                        content: Text('Necessites afegir un vehicle a la teva conta abans de reservar'),
+                        backgroundColor: Colors.red,
+                        ),
+                        );
+                        Navigator.pop(context);
+                        return;
+                        }
                         // Verificar disponibilidad
                         final bool available = await _checkAvailability(
-                            carrerId.toString(),
-                            selectedDate,
-                            selectedTime,
-                            durationHours
+                        carrerId.toString(),
+                        selectedDate,
+                        selectedTime,
+                        durationHours
                         );
 
                         if (!available) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('No hi ha places disponibles en aquesta franja horària.'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                          return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                        content: Text('No hi ha places disponibles en aquesta franja horària.'),
+                        backgroundColor: Colors.red,
+                        ),
+                        );
+                        return;
                         }
 
                         // Crear DateTime para la hora de inicio
                         final startTime = DateTime(
-                          selectedDate.year,
-                          selectedDate.month,
-                          selectedDate.day,
-                          selectedTime.hour,
-                          selectedTime.minute,
+                        selectedDate.year,
+                        selectedDate.month,
+                        selectedDate.day,
+                        selectedTime.hour,
+                        selectedTime.minute,
                         );
 
                         // Realizar la reserva
                         reservationProvider.addReservation(
-                          userId: user.id,
-                          vehicleId: vehicleId,
-                          carrerId: carrerId.toString(),
-                          vehicleMatricula: user.licensePlate,
-                          carrerNom: street,
-                          startTime: startTime,
-                          durationHours: durationHours,
+                        userId: user.id,
+                        vehicleId: vehicleId,
+                        carrerId: carrerId.toString(),
+                        vehicleMatricula: user.licensePlate ?? '-',
+                        carrerNom: street,
+                        startTime: startTime,
+                        durationHours: durationHours,
                         );
 
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Reserva confirmada.')),
+                        const SnackBar(content: Text('Reserva confirmada.')),
                         );
-                      },
-                      child: const Text('Reservar', style: TextStyle(color: Colors.white)),
-                    ),
+                        },
+                        child: const Text('Reservar', style: TextStyle(color: Colors.white)),
+                      ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -613,6 +637,43 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   void _reservarPlaza(BuildContext context, PoiMarker marker) async {
     if (marker.plazasLibres <= 0) return;
 
+    // Variable para almacenar el mensaje de distancia/tiempo
+    String distanceMessage = 'Tens 10 minuts per arribar';
+
+    try {
+      // Comprobar permisos de ubicación
+      LocationPermission permission = await Geolocator.checkPermission();
+      bool hasPermission = permission != LocationPermission.denied &&
+          permission != LocationPermission.deniedForever;
+
+      if (hasPermission) {
+        // Obtener ubicación actual
+        final position = await Geolocator.getCurrentPosition();
+        final currentLocation = LatLng(position.latitude, position.longitude);
+
+        // Calcular distancia en metros
+        final distance = Geolocator.distanceBetween(
+            currentLocation.latitude,
+            currentLocation.longitude,
+            marker.point.latitude,
+            marker.point.longitude
+        );
+
+        // Convertir a kilómetros y calcular tiempo estimado (velocidad media de 30 km/h)
+        final distanceInKm = distance / 1000;
+        final estimatedTimeInMinutes = (distanceInKm / 30) * 60;
+
+        // Formatear mensaje
+        distanceMessage = 'Distància: ${distanceInKm.toStringAsFixed(1)} km\n'
+            'Temps estimat d\'arribada: ${estimatedTimeInMinutes.round()} minuts';
+      } else {
+        distanceMessage = 'Activa la ubicació per saber el temps d\'arribada';
+      }
+    } catch (e) {
+      print('Error al obtener la ubicación: $e');
+      distanceMessage = 'Activa la ubicació per saber el temps d\'arribada';
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -623,7 +684,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             Text('Ubicació: ${marker.title}'),
             const SizedBox(height: 10),
             const Text('Tarifa: 5€/hora'),
-            const Text('Tens 10 minuts per arribar'),
+            Text(distanceMessage),
             const SizedBox(height: 10),
             const Text('Confirmes la reserva?'),
           ],
@@ -656,7 +717,20 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         return;
       }
 
-      final vehicleId = "aa2078a8-bad9-4bbd-af69-ed306bac2f00";
+      // Obtener el vehículo del usuario
+      final userVehicle = await _getUserVehicle(user.id);
+      if (userVehicle == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Necessites afegir un vehicle al teu perfil abans de reservar'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      final vehicleId = userVehicle['id'];
       final carrerId = marker.carrerId;
 
       try {
@@ -666,7 +740,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           userId: user.id,
           vehicleId: vehicleId,
           carrerId: carrerId.toString(),
-          vehicleMatricula: user.licensePlate,
+          vehicleMatricula: userVehicle['matricula'] ?? '-',
           carrerNom: marker.title,
         );
         if (!mounted) return;
@@ -678,7 +752,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al fer la reserva: $e')),
+          SnackBar(content: Text('Error al reservar: $e')),
         );
       }
     }
@@ -853,20 +927,51 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                     popupDisplayOptions: PopupDisplayOptions(
                       builder: (BuildContext context, Marker marker) {
                         if (marker is PoiMarker) {
-                          return Card(
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(marker.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  Text(marker.description),
-                                  const SizedBox(height: 8),
-                                  ElevatedButton(
-                                    onPressed: () => _reservarPlaza(context, marker),
-                                    child: const Text('Reservar'),
-                                  ),
-                                ],
+                          return SizedBox(
+                            width: 200, // Limita el ancho del popup
+                            child: Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(marker.title,
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    Text(marker.description,
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      children: [
+                                        // Botón Cancelar
+                                        Expanded(
+                                          child: ElevatedButton(
+                                            onPressed: () {
+                                              poiPopupController.hideAllPopups();
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              padding: const EdgeInsets.symmetric(vertical: 8),
+                                            ),
+                                            child: const Text('Cancelar', style: TextStyle(fontSize: 12)),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        // Botón Reservar
+                                        Expanded(
+                                          child: ElevatedButton(
+                                            onPressed: () => _reservarPlaza(context, marker),
+                                            style: ElevatedButton.styleFrom(
+                                              padding: const EdgeInsets.symmetric(vertical: 8),
+                                            ),
+                                            child: const Text('Reservar', style: TextStyle(fontSize: 12)),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           );

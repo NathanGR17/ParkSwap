@@ -10,7 +10,7 @@ class User {
   final String surname;
   final String email;
   final String phone;
-  final String licensePlate;
+  final String? licensePlate;
   final int points;
   final String? cardInfo;
 
@@ -20,7 +20,7 @@ class User {
     required this.surname,
     required this.email,
     required this.phone,
-    required this.licensePlate,
+    this.licensePlate,
     this.points = 200,
     this.cardInfo,
   });
@@ -60,8 +60,8 @@ class AuthProvider with ChangeNotifier {
     required String surname,
     required String email,
     required String phone,
-    required String licensePlate,
     required String password,
+    String? licensePlate,
   }) async {
     final supabase = Supabase.instance.client;
     final passwordHash = BCrypt.hashpw(password, BCrypt.gensalt());

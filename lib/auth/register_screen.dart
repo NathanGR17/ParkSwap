@@ -1,7 +1,8 @@
+// En lib/auth/register_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:parkswap/auth/auth_provider.dart';
-import 'package:parkswap/auth/payment_screen.dart';
+import 'package:parkswap/auth/vehicle_screen.dart'; // Importar nueva pantalla
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -16,7 +17,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _surnameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
-  final _licensePlateController = TextEditingController();
+  // Eliminamos _licensePlateController
   final _passwordController = TextEditingController();
 
   @override
@@ -111,25 +112,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   return null;
                 },
               ),
-              const SizedBox(height: 15),
-              const Text(
-                'Matrícula',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 5),
-              TextFormField(
-                controller: _licensePlateController,
-                decoration: const InputDecoration(
-                  hintText: 'Introdueix la teva matrícula',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Si us plau, introdueix la teva matrícula';
-                  }
-                  return null;
-                },
-              ),
+              // Eliminamos el campo de matrícula
               const SizedBox(height: 15),
               const Text(
                 'Contrasenya',
@@ -163,12 +146,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       surname: _surnameController.text,
                       email: _emailController.text,
                       phone: _phoneController.text,
-                      licensePlate: _licensePlateController.text,
                       password: _passwordController.text,
+                      // Ya no pasamos licensePlate
                     );
+                    // Navegar a la pantalla de vehículo en lugar de pago
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const PaymentScreen()),
+                      MaterialPageRoute(builder: (context) => const VehicleScreen()),
                     );
                   }
                 },

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'map_screen.dart';
-import 'search_screen.dart';
 import 'reservations_screen.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
